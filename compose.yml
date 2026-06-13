@@ -1,0 +1,23 @@
+services:
+  ansible:
+    image: ghcr.io/specsnl/ansible:${ANSIBLE_TAG_VERSION:-1.11.0}
+    volumes:
+      - ./:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  markdown-linter:
+    image: davidanson/markdownlint-cli2:v0.23.2
+    profiles: [markdown-lint]
+    volumes:
+      - ./:/workdir
+
+  markdown-table-formatter:
+    image: node:24.15.0-bookworm
+    profiles: [markdown-lint]
+    working_dir: /workdir
+    entrypoint:
+      - bash
+      - -c
+      - find . -name '*.md' -not -path './collections/*' -print0 | xargs -0 npx --yes markdown-table-formatter
+    volumes:
+      - ./:/workdir

@@ -1,0 +1,109 @@
+name: Pull Requests
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Changes Filter
+    runs-on: ubuntu-24.04
+    outputs:
+      lint: ${{ steps.filter.outputs.lint }}
+      base: ${{ steps.filter.outputs.base }}
+      hardening: ${{ steps.filter.outputs.hardening }}
+      firewall: ${{ steps.filter.outputs.firewall }}
+      unattended_upgrades: ${{ steps.filter.outputs.unattended_upgrades }}
+      postgresql: ${{ steps.filter.outputs.postgresql }}
+      cleanup: ${{ steps.filter.outputs.cleanup }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            lint:
+              - "**/*.yml"
+              - "**/*.yaml"
+              - ".ansible-lint"
+              - ".yamllint"
+              - "galaxy.yml"
+              - "meta/**"
+            base:
+              - "roles/base/**"
+            hardening:
+              - "roles/hardening/**"
+            firewall:
+              - "roles/firewall/**"
+            unattended_upgrades:
+              - "roles/unattended_upgrades/**"
+            postgresql:
+              - "roles/postgresql/**"
+            cleanup:
+              - "roles/cleanup/**"
+
+  lint:
+    name: Lint
+    needs: changes
+    if: ${{ needs.changes.outputs.lint == 'true' }}
+    runs-on: ubuntu-24.04
+    container: ghcr.io/specsnl/ansible:latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install collection deps
+        run: ansible-galaxy collection install -r requirements.yml -q
+      - name: yamllint
+        run: yamllint .
+      - name: ansible-lint
+        run: ansible-lint
+
+  molecule:
+    name: Molecule (${{ matrix.role }})
+    needs: changes
+    runs-on: ubuntu-24.04
+    container: ghcr.io/specsnl/ansible:latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - role: base
+            run: ${{ needs.changes.outputs.base }}
+          - role: hardening
+            run: ${{ needs.changes.outputs.hardening }}
+          - role: firewall
+            run: ${{ needs.changes.outputs.firewall }}
+          - role: unattended_upgrades
+            run: ${{ needs.changes.outputs.unattended_upgrades }}
+          - role: postgresql
+            run: ${{ needs.changes.outputs.postgresql }}
+          - role: cleanup
+            run: ${{ needs.changes.outputs.cleanup }}
+    steps:
+      - uses: actions/checkout@v6
+        if: ${{ matrix.run == 'true' }}
+      - name: Install collection deps
+        if: ${{ matrix.run == 'true' }}
+        run: |
+          ansible-galaxy collection install -r requirements.yml -q
+          ansible-galaxy collection install . --force -q
+      - name: Molecule test
+        if: ${{ matrix.run == 'true' }}
+        working-directory: roles/${{ matrix.role }}
+        run: molecule test
+
+  check:
+    name: Check
+    runs-on: ubuntu-24.04
+    needs: [lint, molecule]
+    if: always()
+    steps:
+      - name: Fail if any job failed or was cancelled
+        run: exit 1
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')

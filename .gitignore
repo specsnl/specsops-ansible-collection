@@ -1,0 +1,13 @@
+.env
+.DS_Store
+/dev
+Taskfile.yml
+dist/
+*.tar.gz
+
+/collections/
+/.ansible/
+
+# Python
+__pycache__/
+*.py[cod]

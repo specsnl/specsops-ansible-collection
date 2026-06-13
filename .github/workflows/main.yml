@@ -1,0 +1,61 @@
+name: Main
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    container: ghcr.io/specsnl/ansible:latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install collection deps
+        run: ansible-galaxy collection install -r requirements.yml -q
+      - name: yamllint
+        run: yamllint .
+      - name: ansible-lint
+        run: ansible-lint
+
+  molecule:
+    name: Molecule (${{ matrix.role }})
+    runs-on: ubuntu-24.04
+    container: ghcr.io/specsnl/ansible:latest
+    strategy:
+      fail-fast: false
+      matrix:
+        role:
+          - base
+          - hardening
+          - firewall
+          - unattended_upgrades
+          - postgresql
+          - cleanup
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install collection deps
+        run: |
+          ansible-galaxy collection install -r requirements.yml -q
+          ansible-galaxy collection install . --force -q
+      - name: Molecule test
+        working-directory: roles/${{ matrix.role }}
+        run: molecule test
+
+  check:
+    name: Check
+    runs-on: ubuntu-24.04
+    needs: [lint, molecule]
+    if: always()
+    steps:
+      - name: Fail if any job failed or was cancelled
+        run: exit 1
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
