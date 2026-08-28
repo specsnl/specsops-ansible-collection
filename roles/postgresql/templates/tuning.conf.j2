@@ -1,0 +1,4 @@
+# Managed by Ansible — specsnl.specsops.postgresql
+{% for key, value in postgresql_tuning.items() %}
+{{ key }} = {{ value }}
+{% endfor %}

@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  role_name: cleanup
+  namespace: specsnl
+  author: Ilyes Ahidar
+  description: Build-time image cleanup — apt autoremove/clean, wipe temp directories
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble
+  galaxy_tags:
+    - ubuntu
+    - noble
+    - cleanup
+    - packer
+dependencies: []

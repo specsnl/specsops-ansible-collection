@@ -1,0 +1,7 @@
+---
+hardening_ssh_dropin_path: /etc/ssh/sshd_config.d/99-hardening.conf
+hardening_ssh_permit_root_login: "no"
+hardening_ssh_password_authentication: "no"
+hardening_ssh_max_auth_tries: 3
+
+hardening_fail2ban_enabled: true

@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  role_name: base
+  namespace: specsnl
+  author: Ilyes Ahidar
+  description: Base system setup — apt update/upgrade, core packages, locale, timezone, sysctl
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble
+  galaxy_tags:
+    - ubuntu
+    - noble
+    - system
+    - base
+dependencies: []

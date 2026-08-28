@@ -1,0 +1,10 @@
+---
+argument_specs:
+  main:
+    short_description: Build-time image cleanup
+    description: Runs apt autoremove and clean, then wipes the contents of temp directories. Intended for use at the end of Packer image builds.
+    options:
+      cleanup_paths:
+        type: list
+        elements: str
+        description: List of directories whose contents will be deleted.

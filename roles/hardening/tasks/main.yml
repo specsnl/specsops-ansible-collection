@@ -1,0 +1,41 @@
+---
+- name: Detect container environment
+  ansible.builtin.set_fact:
+    hardening_in_container: >-
+      {{ (ansible_facts['virtualization_type'] | default('') in
+          ['docker', 'container', 'containerd', 'podman', 'lxc'])
+         or (lookup('ansible.builtin.fileglob', '/.dockerenv') | length > 0) }}
+  when: hardening_in_container is not defined
+
+- name: Install fail2ban
+  ansible.builtin.apt:
+    name: fail2ban
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: hardening_fail2ban_enabled
+
+- name: Ensure sshd_config.d directory exists
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy sshd hardening drop-in
+  ansible.builtin.template:
+    src: sshd-99-hardening.conf.j2
+    dest: "{{ hardening_ssh_dropin_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+    validate: "/usr/sbin/sshd -t -f %s"
+  notify: Restart sshd
+
+- name: Enable and start fail2ban
+  ansible.builtin.systemd_service:
+    name: fail2ban
+    enabled: true
+    state: "{{ 'started' if not hardening_in_container else omit }}"
+  when: hardening_fail2ban_enabled

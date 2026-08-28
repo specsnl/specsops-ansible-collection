@@ -1,0 +1,49 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+        manager: apt
+
+    - name: Assert base packages are installed
+      ansible.builtin.assert:
+        that:
+          - "'curl' in ansible_facts.packages"
+          - "'git' in ansible_facts.packages"
+          - "'jq' in ansible_facts.packages"
+          - "'gnupg' in ansible_facts.packages"
+          - "'ca-certificates' in ansible_facts.packages"
+          - "'locales' in ansible_facts.packages"
+        fail_msg: "One or more base packages are missing"
+
+    - name: Stat /etc/default/locale
+      ansible.builtin.stat:
+        path: /etc/default/locale
+      register: locale_file
+
+    - name: Assert locale file exists
+      ansible.builtin.assert:
+        that: locale_file.stat.exists
+        fail_msg: "/etc/default/locale does not exist"
+
+    - name: Read /etc/default/locale
+      ansible.builtin.slurp:
+        src: /etc/default/locale
+      register: locale_content
+
+    - name: Assert LANG is set correctly
+      ansible.builtin.assert:
+        that: "'LANG=en_US.UTF-8' in (locale_content.content | b64decode)"
+        fail_msg: "LANG is not set to en_US.UTF-8"
+
+    - name: Stat sysctl drop-in file
+      ansible.builtin.stat:
+        path: /etc/sysctl.d/99-base.conf
+      register: sysctl_file
+
+    - name: Assert sysctl drop-in exists
+      ansible.builtin.assert:
+        that: sysctl_file.stat.exists
+        fail_msg: "/etc/sysctl.d/99-base.conf does not exist"

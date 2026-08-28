@@ -1,0 +1,16 @@
+---
+unattended_upgrades_packages:
+  - unattended-upgrades
+  - chrony
+
+unattended_upgrades_periodic_update: "1"
+unattended_upgrades_periodic_unattended: "1"
+
+unattended_upgrades_allowed_origins:
+  - "${distro_id}:${distro_codename}-security"
+
+unattended_upgrades_autofix_dpkg: "true"
+unattended_upgrades_minimal_steps: "true"
+unattended_upgrades_remove_unused: "true"
+
+unattended_upgrades_chrony_enabled: true

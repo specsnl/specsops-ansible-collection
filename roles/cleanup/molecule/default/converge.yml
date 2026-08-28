@@ -1,0 +1,8 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  tasks:
+    - name: Include cleanup role
+      ansible.builtin.include_role:
+        name: specsnl.specsops.cleanup

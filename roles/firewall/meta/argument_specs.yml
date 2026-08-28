@@ -1,0 +1,22 @@
+---
+argument_specs:
+  main:
+    short_description: ufw firewall baseline
+    description: Installs and configures ufw with default deny-incoming / allow-outgoing and parameterized rules.
+    options:
+      firewall_default_incoming:
+        type: str
+        default: deny
+        description: Default ufw incoming policy (deny or allow).
+      firewall_default_outgoing:
+        type: str
+        default: allow
+        description: Default ufw outgoing policy (allow or deny).
+      firewall_rules:
+        type: list
+        elements: dict
+        description: Base firewall rules applied before extra_rules. Each dict has rule, port, proto.
+      firewall_extra_rules:
+        type: list
+        elements: dict
+        description: Additional rules appended after firewall_rules. Composition seam for other roles/playbooks.

@@ -1,0 +1,36 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+        manager: apt
+
+    - name: Assert fail2ban is installed
+      ansible.builtin.assert:
+        that: "'fail2ban' in ansible_facts.packages"
+        fail_msg: "fail2ban is not installed"
+
+    - name: Stat sshd hardening drop-in
+      ansible.builtin.stat:
+        path: /etc/ssh/sshd_config.d/99-hardening.conf
+      register: sshd_dropin
+
+    - name: Assert sshd drop-in exists
+      ansible.builtin.assert:
+        that: sshd_dropin.stat.exists
+        fail_msg: "/etc/ssh/sshd_config.d/99-hardening.conf does not exist"
+
+    - name: Read sshd hardening drop-in
+      ansible.builtin.slurp:
+        src: /etc/ssh/sshd_config.d/99-hardening.conf
+      register: sshd_content
+
+    - name: Assert sshd hardening settings
+      ansible.builtin.assert:
+        that:
+          - "'PermitRootLogin no' in (sshd_content.content | b64decode)"
+          - "'PasswordAuthentication no' in (sshd_content.content | b64decode)"
+          - "'MaxAuthTries 3' in (sshd_content.content | b64decode)"
+        fail_msg: "sshd hardening settings are not correct"

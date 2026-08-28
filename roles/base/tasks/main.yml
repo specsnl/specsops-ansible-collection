@@ -1,0 +1,46 @@
+---
+- name: Detect container environment
+  ansible.builtin.set_fact:
+    base_in_container: >-
+      {{ (ansible_facts['virtualization_type'] | default('') in
+          ['docker', 'container', 'containerd', 'podman', 'lxc'])
+         or (lookup('ansible.builtin.fileglob', '/.dockerenv') | length > 0) }}
+  when: base_in_container is not defined
+
+- name: Update apt cache and upgrade packages
+  ansible.builtin.apt:
+    update_cache: true
+    upgrade: "{{ base_apt_upgrade }}"
+    cache_valid_time: "{{ base_apt_cache_valid_time }}"
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name: "{{ base_packages }}"
+    state: present
+
+- name: Generate locale
+  community.general.locale_gen:
+    name: "{{ base_locale }}"
+    state: present
+
+- name: Set system LANG
+  ansible.builtin.template:
+    src: locale.j2
+    dest: /etc/default/locale
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Set timezone
+  community.general.timezone:
+    name: "{{ base_timezone }}"
+
+- name: Apply sysctl settings
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: "{{ base_sysctl_file }}"
+    reload: "{{ not (base_in_container | bool) }}"
+    sysctl_set: "{{ not (base_in_container | bool) }}"
+    state: present
+  loop: "{{ base_sysctl | dict2items }}"

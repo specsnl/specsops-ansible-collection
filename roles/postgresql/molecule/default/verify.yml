@@ -1,0 +1,61 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+        manager: apt
+
+    - name: Assert postgresql-18 is installed
+      ansible.builtin.assert:
+        that: "'postgresql-18' in ansible_facts.packages"
+        fail_msg: "postgresql-18 is not installed"
+
+    - name: Stat tuning.conf
+      ansible.builtin.stat:
+        path: /etc/postgresql/18/main/conf.d/tuning.conf
+      register: tuning_conf
+
+    - name: Assert tuning.conf exists
+      ansible.builtin.assert:
+        that: tuning_conf.stat.exists
+        fail_msg: "/etc/postgresql/18/main/conf.d/tuning.conf does not exist"
+
+    - name: Read tuning.conf
+      ansible.builtin.slurp:
+        src: /etc/postgresql/18/main/conf.d/tuning.conf
+      register: tuning_content
+
+    - name: Assert tuning settings are present with the expected values
+      ansible.builtin.assert:
+        that:
+          - "'shared_buffers = 256MB' in (tuning_content.content | b64decode)"
+          - "'effective_cache_size = 1GB' in (tuning_content.content | b64decode)"
+          - "'work_mem = 4MB' in (tuning_content.content | b64decode)"
+          - "'maintenance_work_mem = 64MB' in (tuning_content.content | b64decode)"
+          - "'max_connections = 100' in (tuning_content.content | b64decode)"
+          - "'logging_collector = on' in (tuning_content.content | b64decode)"
+        fail_msg: "tuning.conf does not match the expected configuration"
+
+    - name: Read postgresql.conf
+      ansible.builtin.slurp:
+        src: /etc/postgresql/18/main/postgresql.conf
+      register: postgresql_conf_content
+
+    # Without an active include_dir the tuning file is written but never read.
+    - name: Assert postgresql.conf includes conf.d
+      ansible.builtin.assert:
+        that: >-
+          "include_dir = 'conf.d'" in (postgresql_conf_content.content | b64decode)
+        fail_msg: "postgresql.conf does not include conf.d — tuning.conf would be ignored"
+
+    - name: Stat PGDG sources list
+      ansible.builtin.stat:
+        path: /etc/apt/sources.list.d/pgdg.sources
+      register: pgdg_sources
+
+    - name: Assert PGDG repo is configured
+      ansible.builtin.assert:
+        that: pgdg_sources.stat.exists
+        fail_msg: "/etc/apt/sources.list.d/pgdg.sources does not exist"

@@ -1,0 +1,26 @@
+---
+argument_specs:
+  main:
+    short_description: OS hardening
+    description: Deploys an sshd drop-in configuration and installs fail2ban.
+    options:
+      hardening_ssh_dropin_path:
+        type: str
+        default: /etc/ssh/sshd_config.d/99-hardening.conf
+        description: Path to the sshd configuration drop-in file.
+      hardening_ssh_permit_root_login:
+        type: str
+        default: "no"
+        description: Value for PermitRootLogin in sshd config.
+      hardening_ssh_password_authentication:
+        type: str
+        default: "no"
+        description: Value for PasswordAuthentication in sshd config.
+      hardening_ssh_max_auth_tries:
+        type: int
+        default: 3
+        description: Value for MaxAuthTries in sshd config.
+      hardening_fail2ban_enabled:
+        type: bool
+        default: true
+        description: Whether to install and enable fail2ban.

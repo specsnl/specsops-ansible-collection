@@ -1,0 +1,20 @@
+---
+galaxy_info:
+  role_name: unattended_upgrades
+  namespace: specsnl
+  author: Ilyes Ahidar
+  description: Automatic security updates — unattended-upgrades and chrony
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble
+  galaxy_tags:
+    - ubuntu
+    - noble
+    - security
+    - updates
+    - chrony
+    - ntp
+dependencies: []

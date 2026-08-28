@@ -1,0 +1,17 @@
+---
+postgresql_version: 18
+postgresql_port: 5432
+
+postgresql_pgdg_key_url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+postgresql_keyring_path: /etc/apt/keyrings/postgresql.gpg
+
+# Set to false to skip opening the firewall port
+postgresql_manage_firewall: true
+
+postgresql_tuning:
+  shared_buffers: 256MB
+  effective_cache_size: 1GB
+  work_mem: 4MB
+  maintenance_work_mem: 64MB
+  max_connections: 100
+  logging_collector: "on"

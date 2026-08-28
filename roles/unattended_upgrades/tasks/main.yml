@@ -1,0 +1,38 @@
+---
+- name: Detect container environment
+  ansible.builtin.set_fact:
+    unattended_upgrades_in_container: >-
+      {{ (ansible_facts['virtualization_type'] | default('') in
+          ['docker', 'container', 'containerd', 'podman', 'lxc'])
+         or (lookup('ansible.builtin.fileglob', '/.dockerenv') | length > 0) }}
+  when: unattended_upgrades_in_container is not defined
+
+- name: Install unattended-upgrades and chrony
+  ansible.builtin.apt:
+    name: "{{ unattended_upgrades_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Deploy 20auto-upgrades config
+  ansible.builtin.template:
+    src: 20auto-upgrades.j2
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy 50unattended-upgrades config
+  ansible.builtin.template:
+    src: 50unattended-upgrades.j2
+    dest: /etc/apt/apt.conf.d/50unattended-upgrades
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Enable and start chrony
+  ansible.builtin.systemd_service:
+    name: chrony
+    enabled: true
+    state: "{{ 'started' if not unattended_upgrades_in_container else omit }}"
+  when: unattended_upgrades_chrony_enabled

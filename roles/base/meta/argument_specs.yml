@@ -1,0 +1,37 @@
+---
+argument_specs:
+  main:
+    short_description: Base system setup
+    description: apt update/upgrade, core packages, locale, timezone, sysctl tuning.
+    options:
+      base_packages:
+        type: list
+        elements: str
+        description: Packages to install.
+      base_apt_upgrade:
+        type: str
+        default: dist
+        description: apt upgrade type passed to the apt module (dist, full, safe, yes, no).
+      base_apt_cache_valid_time:
+        type: int
+        default: 3600
+        description: Cache validity in seconds before forcing an apt update.
+      base_locale:
+        type: str
+        default: en_US.UTF-8
+        description: Locale to generate.
+      base_lang:
+        type: str
+        default: en_US.UTF-8
+        description: Value written to LANG in /etc/default/locale.
+      base_timezone:
+        type: str
+        default: UTC
+        description: Timezone to configure (e.g. UTC, Europe/Amsterdam).
+      base_sysctl_file:
+        type: str
+        default: /etc/sysctl.d/99-base.conf
+        description: Path to the sysctl drop-in file.
+      base_sysctl:
+        type: dict
+        description: Map of sysctl key/value pairs to apply.

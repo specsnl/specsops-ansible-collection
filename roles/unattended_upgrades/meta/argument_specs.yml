@@ -1,0 +1,38 @@
+---
+argument_specs:
+  main:
+    short_description: Automatic security updates
+    description: Installs unattended-upgrades and chrony; deploys apt periodic and upgrade config.
+    options:
+      unattended_upgrades_packages:
+        type: list
+        elements: str
+        description: Packages to install.
+      unattended_upgrades_periodic_update:
+        type: str
+        default: "1"
+        description: APT::Periodic::Update-Package-Lists value.
+      unattended_upgrades_periodic_unattended:
+        type: str
+        default: "1"
+        description: APT::Periodic::Unattended-Upgrade value.
+      unattended_upgrades_allowed_origins:
+        type: list
+        elements: str
+        description: Origins from which unattended upgrades are allowed.
+      unattended_upgrades_autofix_dpkg:
+        type: str
+        default: "true"
+        description: Unattended-Upgrade::AutoFixInterruptedDpkg value.
+      unattended_upgrades_minimal_steps:
+        type: str
+        default: "true"
+        description: Unattended-Upgrade::MinimalSteps value.
+      unattended_upgrades_remove_unused:
+        type: str
+        default: "true"
+        description: Unattended-Upgrade::Remove-Unused-Dependencies value.
+      unattended_upgrades_chrony_enabled:
+        type: bool
+        default: true
+        description: Whether to enable and start chrony.

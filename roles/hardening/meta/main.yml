@@ -1,0 +1,20 @@
+---
+galaxy_info:
+  role_name: hardening
+  namespace: specsnl
+  author: Ilyes Ahidar
+  description: OS hardening — sshd drop-in config and fail2ban
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble
+  galaxy_tags:
+    - ubuntu
+    - noble
+    - hardening
+    - security
+    - ssh
+    - fail2ban
+dependencies: []
