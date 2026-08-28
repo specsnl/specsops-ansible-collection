@@ -9,7 +9,7 @@ driver:
 
 platforms:
   - name: ubuntu2404
-    image: geerlingguy/docker-ubuntu2404-ansible:latest
+    image: geerlingguy/docker-ubuntu2404-ansible@sha256:6bbfbb5367ab236855229048735716e47c4640e38b1ec62b7ddbfb904ec36684
     pre_build_image: true
     command: /usr/lib/systemd/systemd
     privileged: true
