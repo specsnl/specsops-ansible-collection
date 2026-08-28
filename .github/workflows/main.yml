@@ -16,7 +16,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-24.04
-    container: ghcr.io/specsnl/ansible:latest
+    container: ghcr.io/specsnl/ansible:1.13.0
     steps:
       - uses: actions/checkout@v6
       - name: Install collection deps
@@ -29,7 +29,7 @@ jobs:
   molecule:
     name: Molecule (${{ matrix.role }})
     runs-on: ubuntu-24.04
-    container: ghcr.io/specsnl/ansible:latest
+    container: ghcr.io/specsnl/ansible:1.13.0
     strategy:
       fail-fast: false
       matrix:

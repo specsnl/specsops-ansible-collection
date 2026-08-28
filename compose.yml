@@ -1,6 +1,6 @@
 services:
   ansible:
-    image: ghcr.io/specsnl/ansible:${ANSIBLE_TAG_VERSION:-1.11.0}
+    image: ghcr.io/specsnl/ansible:${ANSIBLE_TAG_VERSION:-1.13.0}
     volumes:
       - ./:/workspace
       - /var/run/docker.sock:/var/run/docker.sock

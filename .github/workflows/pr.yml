@@ -60,7 +60,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.lint == 'true' }}
     runs-on: ubuntu-24.04
-    container: ghcr.io/specsnl/ansible:latest
+    container: ghcr.io/specsnl/ansible:1.13.0
     steps:
       - uses: actions/checkout@v6
       - name: Install collection deps
@@ -74,7 +74,7 @@ jobs:
     name: Molecule (${{ matrix.role }})
     needs: changes
     runs-on: ubuntu-24.04
-    container: ghcr.io/specsnl/ansible:latest
+    container: ghcr.io/specsnl/ansible:1.13.0
     strategy:
       fail-fast: false
       matrix:
