@@ -1,0 +1,4 @@
+# Managed by Ansible — specsnl.specsops.base
+# Ubuntu 22.04+ defaults $nrconf{restart} to 'i' (interactive), which makes apt
+# block on a whiptail service-restart prompt and hang unattended runs.
+$nrconf{restart} = 'a';

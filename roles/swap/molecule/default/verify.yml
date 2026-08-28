@@ -1,0 +1,49 @@
+---
+# A container cannot swapon, so this scenario can only prove the role degrades
+# safely and that the sysctl drop-in is rendered. Swap activation itself has to
+# be verified on a real VM — see the role README.
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Stat swap file
+      ansible.builtin.stat:
+        path: /swapfile
+      register: swap_file
+
+    - name: Assert no swap file was created in a container
+      ansible.builtin.assert:
+        that: not swap_file.stat.exists
+        fail_msg: "/swapfile was created inside a container — the container guard failed"
+
+    - name: Read fstab
+      ansible.builtin.slurp:
+        src: /etc/fstab
+      register: fstab_content
+
+    - name: Assert fstab was not touched in a container
+      ansible.builtin.assert:
+        that: "'/swapfile' not in (fstab_content.content | b64decode)"
+        fail_msg: "/etc/fstab gained a swap entry inside a container"
+
+    - name: Stat swap sysctl drop-in
+      ansible.builtin.stat:
+        path: /etc/sysctl.d/99-swap.conf
+      register: swap_sysctl
+
+    - name: Assert swap sysctl drop-in exists
+      ansible.builtin.assert:
+        that: swap_sysctl.stat.exists
+        fail_msg: "/etc/sysctl.d/99-swap.conf does not exist"
+
+    - name: Read swap sysctl drop-in
+      ansible.builtin.slurp:
+        src: /etc/sysctl.d/99-swap.conf
+      register: swap_sysctl_content
+
+    - name: Assert swap sysctl values
+      ansible.builtin.assert:
+        that:
+          - "'vm.swappiness=30' in (swap_sysctl_content.content | b64decode)"
+          - "'vm.vfs_cache_pressure=50' in (swap_sysctl_content.content | b64decode)"
+        fail_msg: "/etc/sysctl.d/99-swap.conf does not match the expected configuration"

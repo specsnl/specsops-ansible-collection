@@ -1,0 +1,45 @@
+---
+- name: Install logrotate
+  ansible.builtin.apt:
+    name: logrotate
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Set global logrotate maxsize
+  ansible.builtin.lineinfile:
+    path: /etc/logrotate.conf
+    regexp: '^#?\s*maxsize\s'
+    line: "maxsize {{ logrotate_maxsize }}"
+    insertafter: '^#\s*see "man logrotate"'
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Set global logrotate compression
+  ansible.builtin.lineinfile:
+    path: /etc/logrotate.conf
+    regexp: '^#?\s*compress\s*$'
+    line: "{{ 'compress' if logrotate_compress else '#compress' }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Stat per-file override targets
+  ansible.builtin.stat:
+    path: "{{ item.key }}"
+  register: logrotate_override_files
+  loop: "{{ logrotate_file_overrides | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Apply per-file maxsize overrides
+  ansible.builtin.lineinfile:
+    path: "{{ item.item.key }}"
+    regexp: '^(\s*)maxsize\s'
+    line: "    maxsize {{ item.item.value }}"
+    insertafter: '^\s*(daily|weekly|monthly|yearly)\s*$'
+  loop: "{{ logrotate_override_files.results }}"
+  loop_control:
+    label: "{{ item.item.key }}"
+  when: item.stat.exists

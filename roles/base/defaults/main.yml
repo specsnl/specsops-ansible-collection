@@ -6,9 +6,21 @@ base_packages:
   - gnupg
   - ca-certificates
   - locales
+  # Required for Ansible become_user to an unprivileged user without falling
+  # back to world-readable temp files.
+  - acl
+  - unzip
 
 base_apt_upgrade: dist
 base_apt_cache_valid_time: 3600
+base_apt_dpkg_options: force-confdef,force-confold
+base_apt_lock_timeout: 300
+
+base_needrestart_automatic: true
+
+# Opt-in: only helps hosts with broken or absent IPv6, and changes resolution
+# behaviour on healthy dual-stack hosts.
+base_prefer_ipv4: false
 
 base_locale: en_US.UTF-8
 base_lang: en_US.UTF-8
@@ -17,4 +29,5 @@ base_timezone: UTC
 base_sysctl_file: /etc/sysctl.d/99-base.conf
 base_sysctl:
   vm.swappiness: "10"
+  vm.vfs_cache_pressure: "50"
   fs.file-max: "200000"

@@ -33,6 +33,9 @@
     state: present
     enabled: true
 
+# The contrib modules (pg_stat_statements, pgcrypto, ...) ship inside this
+# package. postgresql-contrib-<version> is a pure virtual package with no
+# candidate — versioned contrib packages stopped at 9.6.
 - name: Install PostgreSQL
   ansible.builtin.apt:
     name: "postgresql-{{ postgresql_version }}"
@@ -56,15 +59,36 @@
     mode: "0640"
   notify: Restart postgresql
 
+# blockinfile rather than a full template, so the distribution's default local
+# and peer rules survive. Absent when the list is empty, so the default is a no-op.
+- name: Manage pg_hba entries
+  ansible.builtin.blockinfile:
+    path: "{{ postgresql_hba_file }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK — specsnl.specsops.postgresql"
+    state: "{{ 'present' if postgresql_hba_entries | length > 0 else 'absent' }}"
+    block: |
+      {% for entry in postgresql_hba_entries %}
+      {{ entry.type }}	{{ entry.database }}	{{ entry.user }}	{{ entry.address | default('') }}	{{ entry.method }}
+      {% endfor %}
+    owner: postgres
+    group: postgres
+    mode: "0640"
+  notify: Restart postgresql
+
 - name: Enable PostgreSQL service
   ansible.builtin.systemd_service:
     name: postgresql
     enabled: true
     state: "{{ 'started' if not postgresql_in_container else omit }}"
 
+# Opening the port while the server listens on loopback only would be
+# misleading, so the rule follows listen_addresses.
 - name: Allow PostgreSQL port through firewall
   community.general.ufw:
     rule: allow
     port: "{{ postgresql_port | string }}"
     proto: tcp
-  when: postgresql_manage_firewall and not postgresql_in_container
+  when:
+    - postgresql_manage_firewall
+    - not postgresql_in_container
+    - postgresql_listen_addresses not in ['localhost', '127.0.0.1', '::1']

@@ -1,0 +1,37 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Read logrotate.conf
+      ansible.builtin.slurp:
+        src: /etc/logrotate.conf
+      register: logrotate_conf
+
+    - name: Assert global directives are set
+      ansible.builtin.assert:
+        that:
+          - "'maxsize 100M' in (logrotate_conf.content | b64decode)"
+          - "'compress' in (logrotate_conf.content | b64decode).split('\n')"
+        fail_msg: "/etc/logrotate.conf does not carry the expected global directives"
+
+    - name: Read the overridden logrotate.d file
+      ansible.builtin.slurp:
+        src: /etc/logrotate.d/apt
+      register: logrotate_apt
+
+    - name: Assert the per-file override was applied
+      ansible.builtin.assert:
+        that: "'maxsize 25M' in (logrotate_apt.content | b64decode)"
+        fail_msg: "/etc/logrotate.d/apt did not receive its maxsize override"
+
+    # The real check: logrotate itself must still be able to parse the result.
+    - name: Parse the full logrotate configuration
+      ansible.builtin.command: logrotate --debug /etc/logrotate.conf
+      register: logrotate_debug
+      changed_when: false
+
+    - name: Assert logrotate reports no configuration errors
+      ansible.builtin.assert:
+        that: "'error' not in logrotate_debug.stderr | lower"
+        fail_msg: "logrotate reported configuration errors: {{ logrotate_debug.stderr }}"

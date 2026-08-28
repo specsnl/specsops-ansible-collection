@@ -1,0 +1,10 @@
+---
+# Applied as global directives in /etc/logrotate.conf, so they cover every job
+# that does not override them — nginx, fail2ban, rsyslog, ufw, redis — without
+# editing any package-owned file in /etc/logrotate.d.
+logrotate_maxsize: 100M
+logrotate_compress: true
+
+# Escape hatch for services that set their own maxsize. Map of file path to the
+# maxsize it should use. Files that do not exist are skipped.
+logrotate_file_overrides: {}

@@ -1,0 +1,73 @@
+---
+- name: Detect container environment
+  ansible.builtin.set_fact:
+    swap_in_container: >-
+      {{ (ansible_facts['virtualization_type'] | default('') in
+          ['docker', 'container', 'containerd', 'podman', 'lxc'])
+         or (lookup('ansible.builtin.fileglob', '/.dockerenv') | length > 0) }}
+  when: swap_in_container is not defined
+
+- name: Stat swap file
+  ansible.builtin.stat:
+    path: "{{ swap_file_path }}"
+  register: swap_file
+
+# Manage swap only when the role owns it. A host that already has vendor swap
+# (and no file of ours) is left alone rather than given a second swap area.
+- name: Decide whether to manage swap
+  ansible.builtin.set_fact:
+    swap_manage: >-
+      {{ swap_enabled
+         and not (swap_in_container | bool)
+         and (swap_file.stat.exists or ansible_facts['swaptotal_mb'] | default(0) | int == 0) }}
+
+- name: Create swap file
+  community.general.filesize:
+    path: "{{ swap_file_path }}"
+    size: "{{ swap_size }}"
+    sparse: false
+    owner: root
+    group: root
+    mode: "0600"
+  register: swap_file_created
+  when: swap_manage
+
+- name: Format swap file
+  ansible.builtin.command: "mkswap {{ swap_file_path }}"
+  when: swap_manage and swap_file_created.changed
+  changed_when: true
+
+- name: Add swap file to fstab
+  ansible.posix.mount:
+    path: none
+    src: "{{ swap_file_path }}"
+    fstype: swap
+    opts: sw
+    state: present
+  when: swap_manage
+
+- name: Read active swap areas
+  ansible.builtin.slurp:
+    src: /proc/swaps
+  register: swap_proc
+  when: swap_manage
+
+- name: Activate swap file
+  ansible.builtin.command: "swapon {{ swap_file_path }}"
+  when: swap_manage and swap_file_path not in (swap_proc.content | b64decode)
+  changed_when: true
+
+# Written even in containers so the drop-in is testable; only applied live
+# where the kernel is actually ours to tune.
+- name: Apply swap sysctl settings
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: "{{ swap_sysctl_file }}"
+    reload: "{{ not (swap_in_container | bool) }}"
+    sysctl_set: "{{ not (swap_in_container | bool) }}"
+    state: present
+  loop:
+    - { key: vm.swappiness, value: "{{ swap_swappiness }}" }
+    - { key: vm.vfs_cache_pressure, value: "{{ swap_vfs_cache_pressure }}" }
+  when: swap_enabled

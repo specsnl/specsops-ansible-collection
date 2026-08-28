@@ -1,0 +1,42 @@
+---
+bugfixes:
+  - >-
+    hardening - the sshd drop-in is now written to ``00-hardening.conf`` instead of
+    ``99-hardening.conf``. OpenSSH's ``Include`` uses the first value it obtains for a
+    keyword, and Ubuntu cloud images ship ``/etc/ssh/sshd_config.d/50-cloud-init.conf``
+    with ``PasswordAuthentication yes``, so the old drop-in was parsed afterwards and
+    silently ignored. Hosts provisioned earlier have the stale ``99-`` file removed.
+  - >-
+    postgresql - the ufw rule is no longer opened when the server listens on loopback
+    only, which previously exposed a port nothing could reach.
+
+security_fixes:
+  - >-
+    hardening - set ``KbdInteractiveAuthentication no`` alongside
+    ``PasswordAuthentication no``. Without it, password login remains reachable through
+    PAM keyboard-interactive.
+
+breaking_changes:
+  - >-
+    hardening - ``hardening_ssh_dropin_path`` now defaults to
+    ``/etc/ssh/sshd_config.d/00-hardening.conf``. If you override it, keep the numeric
+    prefix below ``50`` or the settings will not take effect on Ubuntu cloud images.
+  - >-
+    postgresql - ``listen_addresses``, ``port``, ``timezone`` and ``log_timezone`` are
+    now rendered from dedicated variables rather than ``postgresql_tuning``. Remove them
+    from that map if you set them there.
+
+minor_changes:
+  - >-
+    base - configure ``needrestart`` for automatic service restarts, set
+    ``DPkg::Lock::Timeout``, and pass ``force-confdef,force-confold`` to dpkg, so an
+    unattended apt upgrade cannot hang on a prompt or fail on a held lock.
+  - base - add ``acl`` and ``unzip`` to ``base_packages`` and ``vm.vfs_cache_pressure`` to ``base_sysctl``.
+  - base - add opt-in ``base_prefer_ipv4`` to prefer IPv4 in ``/etc/gai.conf``.
+  - postgresql - add ``postgresql_listen_addresses``, ``postgresql_timezone`` and ``postgresql_hba_entries``.
+  - >-
+    unattended_upgrades - also set ``APT::Periodic::Download-Upgradeable-Packages`` and
+    ``APT::Periodic::AutocleanInterval``, the latter keeping ``/var/cache/apt`` from
+    growing unbounded.
+  - swap - new role that creates, formats, persists and activates a swap file, and applies the related sysctl tuning.
+  - logrotate - new role that caps rotated log size and enables compression globally in ``/etc/logrotate.conf``.

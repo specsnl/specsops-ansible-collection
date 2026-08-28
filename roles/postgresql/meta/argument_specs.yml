@@ -18,10 +18,33 @@ argument_specs:
       postgresql_keyring_path:
         type: str
         description: Destination path for the dearmored GPG keyring (unused with deb822_repository).
+      postgresql_listen_addresses:
+        type: str
+        default: localhost
+        description: >-
+          Value for listen_addresses. Loopback-only by default; the firewall rule is
+          gated on this so the port is not opened for a server nothing can reach.
+      postgresql_timezone:
+        type: str
+        default: UTC
+        description: Value for both timezone and log_timezone.
       postgresql_manage_firewall:
         type: bool
         default: true
-        description: When true, opens postgresql_port/tcp in ufw (skipped in containers).
+        description: >-
+          When true, opens postgresql_port/tcp in ufw. Skipped in containers and when
+          postgresql_listen_addresses is loopback-only.
+      postgresql_hba_entries:
+        type: list
+        elements: dict
+        default: []
+        description: >-
+          pg_hba.conf entries appended inside an Ansible-managed marker block. Keys:
+          type, database, user, address (optional for local), method. Empty by default,
+          leaving the distribution's rules untouched.
       postgresql_tuning:
         type: dict
-        description: Map of postgresql.conf parameter names to values written to tuning.conf.
+        description: >-
+          Map of postgresql.conf parameter names to values written to tuning.conf.
+          listen_addresses, port, timezone and log_timezone have dedicated variables
+          and are rendered separately.

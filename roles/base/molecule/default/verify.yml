@@ -16,7 +16,35 @@
           - "'gnupg' in ansible_facts.packages"
           - "'ca-certificates' in ansible_facts.packages"
           - "'locales' in ansible_facts.packages"
+          - "'acl' in ansible_facts.packages"
+          - "'unzip' in ansible_facts.packages"
         fail_msg: "One or more base packages are missing"
+
+    - name: Stat unattended-run drop-ins
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: base_dropins
+      loop:
+        - /etc/needrestart/conf.d/99-ansible.conf
+        - /etc/apt/apt.conf.d/90lock-timeout
+
+    - name: Assert unattended-run drop-ins exist
+      ansible.builtin.assert:
+        that: item.stat.exists
+        fail_msg: "{{ item.item }} does not exist"
+      loop: "{{ base_dropins.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Read apt lock timeout drop-in
+      ansible.builtin.slurp:
+        src: /etc/apt/apt.conf.d/90lock-timeout
+      register: base_lock_timeout
+
+    - name: Assert apt lock timeout is set
+      ansible.builtin.assert:
+        that: "'DPkg::Lock::Timeout \"300\";' in (base_lock_timeout.content | b64decode)"
+        fail_msg: "DPkg::Lock::Timeout is not set to 300"
 
     - name: Stat /etc/default/locale
       ansible.builtin.stat:

@@ -1,0 +1,11 @@
+---
+swap_enabled: true
+
+swap_file_path: /swapfile
+swap_size: 1G
+
+swap_sysctl_file: /etc/sysctl.d/99-swap.conf
+# Higher than the base role's default of 10: with a swap file present, some
+# willingness to swap is the point. Set base_sysctl.vm.swappiness or this, not both.
+swap_swappiness: "30"
+swap_vfs_cache_pressure: "50"

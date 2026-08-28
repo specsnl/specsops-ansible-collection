@@ -1,0 +1,5 @@
+// Managed by Ansible — specsnl.specsops.base
+// Wait rather than fail when unattended-upgrades holds the dpkg/apt lock,
+// which it routinely does on freshly booted cloud instances.
+DPkg::Lock::Timeout "{{ base_apt_lock_timeout }}";
+APT::Get::Lock::Timeout "{{ base_apt_lock_timeout }}";

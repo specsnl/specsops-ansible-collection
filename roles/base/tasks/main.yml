@@ -7,11 +7,47 @@
          or (lookup('ansible.builtin.fileglob', '/.dockerenv') | length > 0) }}
   when: base_in_container is not defined
 
+# Everything below must precede the apt upgrade — these are the settings that
+# stop it from hanging or failing on an unattended run.
+- name: Ensure needrestart conf.d directory exists
+  ansible.builtin.file:
+    path: /etc/needrestart/conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: base_needrestart_automatic
+
+- name: Configure needrestart to restart services automatically
+  ansible.builtin.template:
+    src: needrestart-ansible.conf.j2
+    dest: /etc/needrestart/conf.d/99-ansible.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: base_needrestart_automatic
+
+- name: Configure apt lock timeout
+  ansible.builtin.template:
+    src: apt-lock-timeout.j2
+    dest: /etc/apt/apt.conf.d/90lock-timeout
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Prefer IPv4 over IPv6 in getaddrinfo
+  ansible.builtin.replace:
+    path: /etc/gai.conf
+    regexp: '^#(precedence\s+::ffff:0:0/96\s+100)'
+    replace: '\1'
+  when: base_prefer_ipv4
+
 - name: Update apt cache and upgrade packages
   ansible.builtin.apt:
     update_cache: true
     upgrade: "{{ base_apt_upgrade }}"
     cache_valid_time: "{{ base_apt_cache_valid_time }}"
+    dpkg_options: "{{ base_apt_dpkg_options }}"
 
 - name: Install base packages
   ansible.builtin.apt:

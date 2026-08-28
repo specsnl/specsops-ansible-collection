@@ -4,7 +4,10 @@ unattended_upgrades_packages:
   - chrony
 
 unattended_upgrades_periodic_update: "1"
+unattended_upgrades_periodic_download: "1"
 unattended_upgrades_periodic_unattended: "1"
+# Without this /var/cache/apt grows unbounded on long-lived hosts.
+unattended_upgrades_autoclean_interval: "7"
 
 unattended_upgrades_allowed_origins:
   - "${distro_id}:${distro_codename}-security"

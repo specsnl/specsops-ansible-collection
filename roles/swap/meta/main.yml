@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  role_name: swap
+  namespace: specsnl
+  author: Ilyes Ahidar
+  description: Swap file provisioning — create, format, persist in fstab, activate, tune sysctl
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble
+  galaxy_tags:
+    - ubuntu
+    - noble
+    - system
+    - swap
+dependencies: []

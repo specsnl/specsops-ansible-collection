@@ -51,6 +51,8 @@
       ansible.builtin.assert:
         that:
           - "'APT::Periodic::Update-Package-Lists \"1\";' in (auto_upgrades_content.content | b64decode)"
+          - "'APT::Periodic::Download-Upgradeable-Packages \"1\";' in (auto_upgrades_content.content | b64decode)"
+          - "'APT::Periodic::AutocleanInterval \"7\";' in (auto_upgrades_content.content | b64decode)"
           - "'APT::Periodic::Unattended-Upgrade \"1\";' in (auto_upgrades_content.content | b64decode)"
         fail_msg: "apt periodic settings are not enabled in 20auto-upgrades"
 

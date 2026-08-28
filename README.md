@@ -21,7 +21,9 @@ that is enforced.
 | `specsnl.specsops.hardening`           | sshd drop-in hardening + fail2ban                           |
 | `specsnl.specsops.firewall`            | ufw baseline + parameterized extra rules                    |
 | `specsnl.specsops.unattended_upgrades` | chrony + unattended-upgrades + apt config                   |
-| `specsnl.specsops.postgresql`          | PGDG repo, PostgreSQL install, tuning, enable               |
+| `specsnl.specsops.postgresql`          | PGDG repo, PostgreSQL install, tuning, access, enable       |
+| `specsnl.specsops.swap`                | swap file create/format/persist/activate + sysctl           |
+| `specsnl.specsops.logrotate`           | global logrotate maxsize + compression                      |
 | `specsnl.specsops.cleanup`             | apt autoremove/clean, wipe temp dirs (build-time)           |
 
 ## Requirements
@@ -54,7 +56,12 @@ ansible-galaxy collection install -r requirements.yml
     - specsnl.specsops.hardening
     - specsnl.specsops.firewall
     - specsnl.specsops.unattended_upgrades
+    - specsnl.specsops.swap
+    - specsnl.specsops.logrotate
 ```
+
+If you use both `base` and `swap`, note that they each manage `vm.swappiness` in their
+own `/etc/sysctl.d/` drop-in. Set it in one of them, not both.
 
 ## Development
 

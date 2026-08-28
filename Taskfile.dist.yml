@@ -11,6 +11,8 @@ vars:
     - hardening
     - unattended_upgrades
     - postgresql
+    - swap
+    - logrotate
     - cleanup
 
 silent: true

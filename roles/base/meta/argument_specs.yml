@@ -16,6 +16,31 @@ argument_specs:
         type: int
         default: 3600
         description: Cache validity in seconds before forcing an apt update.
+      base_apt_dpkg_options:
+        type: str
+        default: force-confdef,force-confold
+        description: >-
+          dpkg options for the upgrade task. Keeps existing conffiles instead of
+          prompting, which would hang an unattended run.
+      base_apt_lock_timeout:
+        type: int
+        default: 300
+        description: >-
+          Seconds apt/dpkg wait for a held lock, written to
+          /etc/apt/apt.conf.d/90lock-timeout. Avoids racing unattended-upgrades
+          on freshly booted hosts.
+      base_needrestart_automatic:
+        type: bool
+        default: true
+        description: >-
+          Drop in $nrconf{restart} = 'a' so needrestart restarts services without
+          an interactive prompt during apt upgrades.
+      base_prefer_ipv4:
+        type: bool
+        default: false
+        description: >-
+          Uncomment the IPv4 precedence rule in /etc/gai.conf. Opt-in; only useful
+          on hosts with broken or absent IPv6.
       base_locale:
         type: str
         default: en_US.UTF-8

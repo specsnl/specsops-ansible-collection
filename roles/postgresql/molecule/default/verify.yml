@@ -36,7 +36,33 @@
           - "'maintenance_work_mem = 64MB' in (tuning_content.content | b64decode)"
           - "'max_connections = 100' in (tuning_content.content | b64decode)"
           - "'logging_collector = on' in (tuning_content.content | b64decode)"
+          - "\"listen_addresses = 'localhost'\" in (tuning_content.content | b64decode)"
+          - "\"timezone = 'UTC'\" in (tuning_content.content | b64decode)"
+          - "\"log_timezone = 'UTC'\" in (tuning_content.content | b64decode)"
         fail_msg: "tuning.conf does not match the expected configuration"
+
+    # Guards the decision not to install postgresql-contrib-<version>: the
+    # contrib extensions are already present via postgresql-18.
+    - name: Stat a contrib extension control file
+      ansible.builtin.stat:
+        path: /usr/share/postgresql/18/extension/pg_stat_statements.control
+      register: pg_contrib_ext
+
+    - name: Assert contrib extensions ship with postgresql-18
+      ansible.builtin.assert:
+        that: pg_contrib_ext.stat.exists
+        fail_msg: "pg_stat_statements is missing — contrib may need a separate package again"
+
+    - name: Read pg_hba.conf
+      ansible.builtin.slurp:
+        src: /etc/postgresql/18/main/pg_hba.conf
+      register: pg_hba_content
+
+    # Default postgresql_hba_entries is empty, so the role must leave no trace.
+    - name: Assert pg_hba.conf has no managed block by default
+      ansible.builtin.assert:
+        that: "'specsnl.specsops.postgresql' not in (pg_hba_content.content | b64decode)"
+        fail_msg: "pg_hba.conf has a managed block despite postgresql_hba_entries being empty"
 
     - name: Read postgresql.conf
       ansible.builtin.slurp:

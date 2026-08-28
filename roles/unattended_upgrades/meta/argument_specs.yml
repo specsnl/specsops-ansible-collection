@@ -12,10 +12,20 @@ argument_specs:
         type: str
         default: "1"
         description: APT::Periodic::Update-Package-Lists value.
+      unattended_upgrades_periodic_download:
+        type: str
+        default: "1"
+        description: APT::Periodic::Download-Upgradeable-Packages value.
       unattended_upgrades_periodic_unattended:
         type: str
         default: "1"
         description: APT::Periodic::Unattended-Upgrade value.
+      unattended_upgrades_autoclean_interval:
+        type: str
+        default: "7"
+        description: >-
+          APT::Periodic::AutocleanInterval value, in days. Without it /var/cache/apt
+          grows unbounded on long-lived hosts.
       unattended_upgrades_allowed_origins:
         type: list
         elements: str

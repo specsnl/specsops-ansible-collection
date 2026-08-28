@@ -1,2 +1,4 @@
 ---
-postgresql_conf_d: "/etc/postgresql/{{ postgresql_version }}/main/conf.d"
+postgresql_data_conf_dir: "/etc/postgresql/{{ postgresql_version }}/main"
+postgresql_conf_d: "{{ postgresql_data_conf_dir }}/conf.d"
+postgresql_hba_file: "{{ postgresql_data_conf_dir }}/pg_hba.conf"

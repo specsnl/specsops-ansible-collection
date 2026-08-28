@@ -1,7 +1,11 @@
 ---
-hardening_ssh_dropin_path: /etc/ssh/sshd_config.d/99-hardening.conf
+# Numbered 00- deliberately: sshd's Include is first-obtained-value-wins, and
+# Ubuntu cloud images ship /etc/ssh/sshd_config.d/50-cloud-init.conf setting
+# PasswordAuthentication yes. A higher number would be silently ignored.
+hardening_ssh_dropin_path: /etc/ssh/sshd_config.d/00-hardening.conf
 hardening_ssh_permit_root_login: "no"
 hardening_ssh_password_authentication: "no"
+hardening_ssh_kbd_interactive_authentication: "no"
 hardening_ssh_max_auth_tries: 3
 
 hardening_fail2ban_enabled: true
