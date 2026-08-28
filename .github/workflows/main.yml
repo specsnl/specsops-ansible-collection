@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Install collection deps
-        run: ansible-galaxy collection install -r requirements.yml -q
+        run: ansible-galaxy collection install -r requirements.yml
       - name: yamllint
         run: yamllint .
       - name: ansible-lint
@@ -39,13 +39,15 @@ jobs:
           - firewall
           - unattended_upgrades
           - postgresql
+          - swap
+          - logrotate
           - cleanup
     steps:
       - uses: actions/checkout@v6
       - name: Install collection deps
         run: |
-          ansible-galaxy collection install -r requirements.yml -q
-          ansible-galaxy collection install . --force -q
+          ansible-galaxy collection install -r requirements.yml
+          ansible-galaxy collection install . --force
       - name: Molecule test
         working-directory: roles/${{ matrix.role }}
         run: molecule test

@@ -22,6 +22,8 @@ jobs:
       firewall: ${{ steps.filter.outputs.firewall }}
       unattended_upgrades: ${{ steps.filter.outputs.unattended_upgrades }}
       postgresql: ${{ steps.filter.outputs.postgresql }}
+      swap: ${{ steps.filter.outputs.swap }}
+      logrotate: ${{ steps.filter.outputs.logrotate }}
       cleanup: ${{ steps.filter.outputs.cleanup }}
     steps:
       - uses: actions/checkout@v6
@@ -46,6 +48,10 @@ jobs:
               - "roles/unattended_upgrades/**"
             postgresql:
               - "roles/postgresql/**"
+            swap:
+              - "roles/swap/**"
+            logrotate:
+              - "roles/logrotate/**"
             cleanup:
               - "roles/cleanup/**"
 
@@ -58,7 +64,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Install collection deps
-        run: ansible-galaxy collection install -r requirements.yml -q
+        run: ansible-galaxy collection install -r requirements.yml
       - name: yamllint
         run: yamllint .
       - name: ansible-lint
@@ -83,6 +89,10 @@ jobs:
             run: ${{ needs.changes.outputs.unattended_upgrades }}
           - role: postgresql
             run: ${{ needs.changes.outputs.postgresql }}
+          - role: swap
+            run: ${{ needs.changes.outputs.swap }}
+          - role: logrotate
+            run: ${{ needs.changes.outputs.logrotate }}
           - role: cleanup
             run: ${{ needs.changes.outputs.cleanup }}
     steps:
@@ -91,8 +101,8 @@ jobs:
       - name: Install collection deps
         if: ${{ matrix.run == 'true' }}
         run: |
-          ansible-galaxy collection install -r requirements.yml -q
-          ansible-galaxy collection install . --force -q
+          ansible-galaxy collection install -r requirements.yml
+          ansible-galaxy collection install . --force
       - name: Molecule test
         if: ${{ matrix.run == 'true' }}
         working-directory: roles/${{ matrix.role }}
