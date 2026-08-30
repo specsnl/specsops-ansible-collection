@@ -1,20 +1,24 @@
 # Role Index
 
-| Role                | FQCN                                   | Description                                                                                                                  |
-|---------------------|----------------------------------------|------------------------------------------------------------------------------------------------------------------------------|
-| base                | `specsnl.specsops.base`                | apt update/upgrade, core packages (curl, git, jq, gnupg, ca-certificates, locales), locale-gen, timezone UTC, sysctl tuning  |
-| hardening           | `specsnl.specsops.hardening`           | sshd drop-in (`99-hardening.conf`): PermitRootLogin no, PasswordAuthentication no, MaxAuthTries 3; fail2ban install + enable |
-| firewall            | `specsnl.specsops.firewall`            | ufw: default deny incoming / allow outgoing, allow SSH 22, container-safe enable, `firewall_extra_rules` composition seam    |
-| unattended_upgrades | `specsnl.specsops.unattended_upgrades` | chrony + unattended-upgrades; `20auto-upgrades` and `50unattended-upgrades` apt config drop-ins                              |
-| postgresql          | `specsnl.specsops.postgresql`          | PGDG apt repo + GPG key, `postgresql-{{ postgresql_version }}` install, tuning.conf template, systemd enable, ufw allow port |
-| cleanup             | `specsnl.specsops.cleanup`             | apt autoremove + clean, wipe `/tmp`, `/var/tmp`, `/var/lib/apt/lists` — build-time only                                      |
+| Role                | FQCN                                   | Description                                                                                                                                    |
+|---------------------|----------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| base                | `specsnl.specsops.base`                | apt update/upgrade, core packages (curl, git, jq, gnupg, ca-certificates, locales, acl, unzip), locale-gen, timezone UTC, sysctl tuning        |
+| hardening           | `specsnl.specsops.hardening`           | sshd drop-in (`00-hardening.conf`): PermitRootLogin no, PasswordAuthentication no, MaxAuthTries 3; fail2ban install + enable                   |
+| firewall            | `specsnl.specsops.firewall`            | ufw: default deny incoming / allow outgoing, allow SSH 22, container-safe enable, `firewall_extra_rules` composition seam                      |
+| unattended_upgrades | `specsnl.specsops.unattended_upgrades` | chrony + unattended-upgrades; `20auto-upgrades` and `50unattended-upgrades` apt config drop-ins                                                |
+| postgresql          | `specsnl.specsops.postgresql`          | PGDG apt repo + GPG key, `postgresql-{{ postgresql_version }}` install, tuning.conf template, `pg_hba` entries, systemd enable, ufw allow port |
+| swap                | `specsnl.specsops.swap`                | non-sparse swap file create/format, `/etc/fstab` persist, activate, `vm.swappiness` + `vm.vfs_cache_pressure` drop-in                          |
+| logrotate           | `specsnl.specsops.logrotate`           | global `maxsize` + `compress` in `/etc/logrotate.conf`, plus per-file overrides for jobs that set their own                                    |
+| cleanup             | `specsnl.specsops.cleanup`             | apt autoremove + clean, wipe `/tmp`, `/var/tmp`, `/var/lib/apt/lists` — build-time only                                                        |
+
+Each role's own README documents its variables in full.
 
 ## Architecture
 
 These roles are consumed by two repos:
 
 ```text
-packer-golden-images          ─requires→  specsnl.specsops  ←requires─  specsops-ansible
+specsops-golden-images        ─requires→  specsnl.specsops  ←requires─  specsops-ansible
   Packer build-time                        (this collection)               ansible-pull runtime
 ```
 
@@ -24,7 +28,9 @@ the system that runs is the system that was tested.
 
 ## Container safety
 
-Roles that touch systemd services or the firewall detect container environments via the
-`in_container` fact and skip steps that are not container-compatible (`ufw enable`,
-`systemctl start`, `sysctl reload`). This allows the same roles to run inside Docker/Podman
+Roles that touch systemd services, swap or the firewall detect container environments and
+skip the steps that are not container-compatible (`ufw enable`, `systemctl start`,
+`swapon`, `sysctl reload`). Each such role derives its own `<role>_in_container` fact and
+only when it is not already defined, so a playbook or Molecule inventory can override it —
+for example `base_in_container: true`. This lets the same roles run inside Docker/Podman
 containers during Packer builds and Molecule tests without error.

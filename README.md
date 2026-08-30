@@ -15,16 +15,23 @@ that is enforced.
 
 ## Roles
 
-| Role                                   | Description                                                 |
-|----------------------------------------|-------------------------------------------------------------|
-| `specsnl.specsops.base`                | apt update/upgrade, core packages, locale, timezone, sysctl |
-| `specsnl.specsops.hardening`           | sshd drop-in hardening + fail2ban                           |
-| `specsnl.specsops.firewall`            | ufw baseline + parameterized extra rules                    |
-| `specsnl.specsops.unattended_upgrades` | chrony + unattended-upgrades + apt config                   |
-| `specsnl.specsops.postgresql`          | PGDG repo, PostgreSQL install, tuning, access, enable       |
-| `specsnl.specsops.swap`                | swap file create/format/persist/activate + sysctl           |
-| `specsnl.specsops.logrotate`           | global logrotate maxsize + compression                      |
-| `specsnl.specsops.cleanup`             | apt autoremove/clean, wipe temp dirs (build-time)           |
+| Role                                   | Description                                                 | Docs                                                             |
+|----------------------------------------|-------------------------------------------------------------|------------------------------------------------------------------|
+| `specsnl.specsops.base`                | apt update/upgrade, core packages, locale, timezone, sysctl | [roles/base](roles/base/README.md)                               |
+| `specsnl.specsops.hardening`           | sshd drop-in hardening + fail2ban                           | [roles/hardening](roles/hardening/README.md)                     |
+| `specsnl.specsops.firewall`            | ufw baseline + parameterized extra rules                    | [roles/firewall](roles/firewall/README.md)                       |
+| `specsnl.specsops.unattended_upgrades` | chrony + unattended-upgrades + apt config                   | [roles/unattended_upgrades](roles/unattended_upgrades/README.md) |
+| `specsnl.specsops.postgresql`          | PGDG repo, PostgreSQL install, tuning, `pg_hba`, ufw port   | [roles/postgresql](roles/postgresql/README.md)                   |
+| `specsnl.specsops.swap`                | swap file create/format/persist/activate + sysctl           | [roles/swap](roles/swap/README.md)                               |
+| `specsnl.specsops.logrotate`           | global logrotate maxsize + compression                      | [roles/logrotate](roles/logrotate/README.md)                     |
+| `specsnl.specsops.cleanup`             | apt autoremove/clean, wipe temp dirs (build-time)           | [roles/cleanup](roles/cleanup/README.md)                         |
+
+Every role documents its variables in its own README; [docs/README.md](docs/README.md)
+carries the condensed index and the notes on container safety.
+
+All roles detect container environments and skip the steps that cannot work there
+(`ufw enable`, `systemctl start`, `swapon`, `sysctl reload`), so the same roles run
+unchanged in a Packer build container, in Molecule, and on a live VM.
 
 ## Requirements
 
@@ -65,24 +72,49 @@ own `/etc/sysctl.d/` drop-in. Set it in one of them, not both.
 
 ## Development
 
-```bash
-# Lint
-task ansible:lint
+Everything runs in containers via [Task](https://taskfile.dev) and Docker Compose —
+you need Docker and `task` on your machine, but no local Ansible, Python or Molecule.
+The `ansible` service (`ghcr.io/specsnl/ansible`) mounts the repo at `/workspace` and
+the Docker socket, so Molecule can start test containers from inside it.
 
-# Test a single role (full molecule create → converge → idempotence → verify → destroy)
+```bash
+# Lint (yamllint + ansible-lint)
+task ansible:lint
+task ansible:lint:ansible:fix   # auto-fix what ansible-lint can
+
+# Test a single role (destroy → syntax → create → converge → idempotence → verify → destroy)
 task ansible:test:base
 
 # Test all roles
 task ansible:test
 
-# Build collection tarball
+# Iterate on one role without tearing the container down
+task ansible:converge:base
+task ansible:verify:base
+task ansible:destroy:base
+
+# Markdown
+task md:checkstyle
+task md:fixstyle
+
+# Interactive shell in the Ansible container
+task shell
+
+# Build / install the collection tarball into ./dist
 task galaxy:build
+task galaxy:install:local
 ```
+
+`task --list` shows every task.
+
+Molecule tests run against `geerlingguy/docker-ubuntu2404-ansible`, pinned by digest,
+with systemd as PID 1.
 
 ### Local testing with Podman
 
-The Molecule driver is `docker`. If you use Podman locally, expose the Podman socket
-so the Docker driver can reach it:
+The Molecule driver is `docker`, and `compose.yml` bind-mounts `/var/run/docker.sock`
+into the `ansible` service. With Podman you need a Docker-API-compatible socket at that
+path, so run Compose against the Podman socket and expose it:
 
 ```bash
 podman system service --time=0 &
@@ -90,9 +122,25 @@ export DOCKER_HOST=unix://${XDG_RUNTIME_DIR}/podman/podman.sock
 task ansible:test:base
 ```
 
+If the socket lives elsewhere, override the bind mount in a `compose.override.yml`
+rather than editing `compose.yml`.
+
 ## Release
 
 1. Add a changelog fragment under `changelogs/fragments/`
 2. Bump `version:` in `galaxy.yml`
-3. Run `task changelog:release:<version>`
-4. Commit, tag `v<version>`, push — CI publishes to Ansible Galaxy automatically
+3. Run `task changelog:release:<version>` — regenerates `CHANGELOG.rst` and consumes
+   the fragments
+4. Commit, tag `v<version>`, push
+
+The tag workflow asserts the tag matches `version:` in `galaxy.yml`, then builds and
+publishes to Ansible Galaxy using the `GALAXY_API_KEY` secret.
+
+## CI
+
+| Workflow                               | Trigger         | Runs                                               |
+|----------------------------------------|-----------------|----------------------------------------------------|
+| [pr.yml](.github/workflows/pr.yml)     | pull request    | Lint + Molecule, only for the roles the PR touches |
+| [main.yml](.github/workflows/main.yml) | push to `main`  | Lint + Molecule for all roles                      |
+| [md.yml](.github/workflows/md.yml)     | `**.md` changes | markdownlint                                       |
+| [tag.yml](.github/workflows/tag.yml)   | `v*` tag        | Build + publish to Ansible Galaxy                  |
