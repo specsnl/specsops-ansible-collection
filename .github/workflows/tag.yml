@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-24.04
     container: ghcr.io/specsnl/ansible:1.13.0
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Assert tag matches galaxy.yml version
         run: |
           GALAXY_VERSION="v$(grep '^version:' galaxy.yml | awk '{print $2}')"
