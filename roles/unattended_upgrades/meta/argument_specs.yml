@@ -29,7 +29,11 @@ argument_specs:
       unattended_upgrades_allowed_origins:
         type: list
         elements: str
-        description: Origins from which unattended upgrades are allowed.
+        description: >-
+          Origins from which unattended upgrades are allowed. Defaults to the
+          distribution security pocket plus Ubuntu's ESMApps/ESM origins; because
+          this role replaces 50unattended-upgrades, omitting the ESM entries turns
+          off ESM security updates on Ubuntu Pro hosts.
       unattended_upgrades_autofix_dpkg:
         type: str
         default: "true"
