@@ -14,7 +14,11 @@
     paths: "{{ item }}"
     file_type: any
     recurse: false
-    excludes: "{{ ['lock', 'partial', 'auxfiles'] if item == '/var/lib/apt/lists' else [] }}"
+    # Trailing slashes normalised: a '/var/lib/apt/lists/' entry in cleanup_paths
+    # would otherwise miss the guard and take apt's lock and partial dir with it.
+    excludes: >-
+      {{ ['lock', 'partial', 'auxfiles']
+         if (item | regex_replace('/+$', '')) == '/var/lib/apt/lists' else [] }}
   register: cleanup_tmp_contents
   loop: "{{ cleanup_paths }}"
 
