@@ -15,9 +15,6 @@ argument_specs:
       postgresql_pgdg_key_url:
         type: str
         description: URL to the PGDG GPG signing key (.asc).
-      postgresql_keyring_path:
-        type: str
-        description: Destination path for the dearmored GPG keyring (unused with deb822_repository).
       postgresql_listen_addresses:
         type: str
         default: localhost
@@ -32,8 +29,9 @@ argument_specs:
         type: bool
         default: true
         description: >-
-          When true, opens postgresql_port/tcp in ufw. Skipped in containers and when
-          postgresql_listen_addresses is loopback-only.
+          When true, opens postgresql_port/tcp in ufw. Skipped in containers, when
+          postgresql_listen_addresses is loopback-only, and when ufw is not
+          installed — the last case logs a warning instead of failing.
       postgresql_hba_entries:
         type: list
         elements: dict

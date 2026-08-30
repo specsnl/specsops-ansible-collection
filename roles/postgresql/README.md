@@ -24,6 +24,11 @@ The server listens on loopback only by default. The ufw rule is gated on
 loopback-only server does not open a port to something nothing can reach — you must
 also widen `listen_addresses`.
 
+The role does not depend on the `firewall` role, so ufw may not be installed. When it
+is missing the rule is skipped with a warning rather than failing the play, which
+would otherwise abort with PostgreSQL already listening off-loopback. Run
+`specsnl.specsops.firewall` first if you want the port opened.
+
 `postgresql_hba_entries` are appended to `pg_hba.conf` inside an Ansible-managed
 marker block, leaving the distribution's default `local`/`peer` rules intact. The
 block is removed when the list is empty.

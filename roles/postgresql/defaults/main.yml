@@ -3,7 +3,6 @@ postgresql_version: 18
 postgresql_port: 5432
 
 postgresql_pgdg_key_url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
-postgresql_keyring_path: /etc/apt/keyrings/postgresql.gpg
 
 # Loopback-only by default. Change this to '*' (or a specific address) to accept
 # remote connections — the firewall rule below is gated on it.
