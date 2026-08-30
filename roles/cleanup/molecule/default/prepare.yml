@@ -1,0 +1,10 @@
+---
+- name: Prepare
+  hosts: all
+  become: true
+  tasks:
+    - name: Create test file in /tmp to confirm cleanup runs
+      ansible.builtin.file:
+        path: /tmp/cleanup-test-file
+        state: touch
+        mode: "0644"

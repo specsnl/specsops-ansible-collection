@@ -1,0 +1,19 @@
+---
+galaxy_info:
+  role_name: postgresql
+  namespace: specsnl
+  author: Ilyes Ahidar
+  description: PostgreSQL installation from PGDG — install, tune, enable
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble
+  galaxy_tags:
+    - ubuntu
+    - noble
+    - postgresql
+    - database
+    - postgres
+dependencies: []

@@ -1,0 +1,94 @@
+---
+# stat, not a fileglob lookup: lookups run on the controller, which is itself a
+# container here, and would mark every target — real VMs included — as one.
+- name: Stat container marker files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: base_container_markers
+  loop:
+    - /.dockerenv
+    - /run/.containerenv
+  when: base_in_container is not defined
+
+- name: Detect container environment
+  ansible.builtin.set_fact:
+    base_in_container: >-
+      {{ (ansible_facts['virtualization_type'] | default('') in
+          ['docker', 'container', 'containerd', 'podman', 'lxc'])
+         or (base_container_markers.results
+             | selectattr('stat.exists') | list | length > 0) }}
+  when: base_in_container is not defined
+
+# Everything below must precede the apt upgrade — these are the settings that
+# stop it from hanging or failing on an unattended run.
+- name: Ensure needrestart conf.d directory exists
+  ansible.builtin.file:
+    path: /etc/needrestart/conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: base_needrestart_automatic
+
+- name: Configure needrestart to restart services automatically
+  ansible.builtin.template:
+    src: needrestart-ansible.conf.j2
+    dest: /etc/needrestart/conf.d/99-ansible.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: base_needrestart_automatic
+
+- name: Configure apt lock timeout
+  ansible.builtin.template:
+    src: apt-lock-timeout.j2
+    dest: /etc/apt/apt.conf.d/90lock-timeout
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Prefer IPv4 over IPv6 in getaddrinfo
+  ansible.builtin.replace:
+    path: /etc/gai.conf
+    regexp: '^#(precedence\s+::ffff:0:0/96\s+100)'
+    replace: '\1'
+  when: base_prefer_ipv4
+
+- name: Update apt cache and upgrade packages
+  ansible.builtin.apt:
+    update_cache: true
+    upgrade: "{{ base_apt_upgrade }}"
+    cache_valid_time: "{{ base_apt_cache_valid_time }}"
+    dpkg_options: "{{ base_apt_dpkg_options }}"
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name: "{{ base_packages }}"
+    state: present
+
+- name: Generate locale
+  community.general.locale_gen:
+    name: "{{ base_locale }}"
+    state: present
+
+- name: Set system LANG
+  ansible.builtin.template:
+    src: locale.j2
+    dest: /etc/default/locale
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Set timezone
+  community.general.timezone:
+    name: "{{ base_timezone }}"
+
+- name: Apply sysctl settings
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: "{{ base_sysctl_file }}"
+    reload: "{{ not (base_in_container | bool) }}"
+    sysctl_set: "{{ not (base_in_container | bool) }}"
+    state: present
+  loop: "{{ base_sysctl | dict2items }}"

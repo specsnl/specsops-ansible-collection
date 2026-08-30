@@ -1,0 +1,30 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Check cleanup test file is absent from /tmp
+      ansible.builtin.stat:
+        path: /tmp/cleanup-test-file
+      register: cleanup_test_file_stat
+
+    - name: Assert cleanup test file was removed from /tmp
+      ansible.builtin.assert:
+        that: not cleanup_test_file_stat.stat.exists
+        fail_msg: "/tmp/cleanup-test-file still exists after cleanup"
+
+    - name: Check /var/lib/apt/lists has no package index files
+      ansible.builtin.find:
+        paths: /var/lib/apt/lists
+        file_type: any
+        recurse: false
+        excludes:
+          - lock
+          - partial
+          - auxfiles
+      register: apt_lists_contents
+
+    - name: Assert /var/lib/apt/lists has no package index files
+      ansible.builtin.assert:
+        that: apt_lists_contents.files | length == 0
+        fail_msg: "/var/lib/apt/lists still contains package index files after cleanup"

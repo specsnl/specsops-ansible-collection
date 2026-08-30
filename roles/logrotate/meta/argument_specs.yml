@@ -1,0 +1,23 @@
+---
+argument_specs:
+  main:
+    short_description: Global logrotate policy
+    description: >-
+      Sets maxsize and compression as global directives in /etc/logrotate.conf, so
+      every job that does not override them is capped, without editing any
+      package-owned file in /etc/logrotate.d.
+    options:
+      logrotate_maxsize:
+        type: str
+        default: 100M
+        description: Global maxsize directive — rotate once a log reaches this size.
+      logrotate_compress:
+        type: bool
+        default: true
+        description: Whether to enable the global compress directive.
+      logrotate_file_overrides:
+        type: dict
+        default: {}
+        description: >-
+          Map of /etc/logrotate.d file path to the maxsize it should use, for services
+          that set their own. Files that do not exist are skipped.

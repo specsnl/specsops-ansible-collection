@@ -1,0 +1,11 @@
+---
+firewall_default_incoming: deny
+firewall_default_outgoing: allow
+
+firewall_rules:
+  - rule: allow
+    port: "22"
+    proto: tcp
+
+# Composition seam: playbooks and other roles append rules here
+firewall_extra_rules: []

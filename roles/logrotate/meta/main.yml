@@ -1,0 +1,19 @@
+---
+galaxy_info:
+  role_name: logrotate
+  namespace: specsnl
+  author: Ilyes Ahidar
+  description: Global logrotate policy — cap rotated log size and enable compression
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble
+  galaxy_tags:
+    - ubuntu
+    - noble
+    - system
+    - logging
+    - logrotate
+dependencies: []

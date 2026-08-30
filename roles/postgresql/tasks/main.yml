@@ -1,0 +1,131 @@
+---
+# stat, not a fileglob lookup: lookups run on the controller, which is itself a
+# container here, and would mark every target — real VMs included — as one.
+- name: Stat container marker files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: postgresql_container_markers
+  loop:
+    - /.dockerenv
+    - /run/.containerenv
+  when: postgresql_in_container is not defined
+
+- name: Detect container environment
+  ansible.builtin.set_fact:
+    postgresql_in_container: >-
+      {{ (ansible_facts['virtualization_type'] | default('') in
+          ['docker', 'container', 'containerd', 'podman', 'lxc'])
+         or (postgresql_container_markers.results
+             | selectattr('stat.exists') | list | length > 0) }}
+  when: postgresql_in_container is not defined
+
+- name: Install python3-debian
+  ansible.builtin.apt:
+    name: python3-debian
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure /etc/apt/keyrings directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Add PostgreSQL PGDG repository
+  ansible.builtin.deb822_repository:
+    name: pgdg
+    types: deb
+    uris: "https://apt.postgresql.org/pub/repos/apt"
+    suites: "{{ ansible_facts['distribution_release'] }}-pgdg"
+    components: main
+    signed_by: "{{ postgresql_pgdg_key_url }}"
+    state: present
+    enabled: true
+
+# The contrib modules (pg_stat_statements, pgcrypto, ...) ship inside this
+# package. postgresql-contrib-<version> is a pure virtual package with no
+# candidate — versioned contrib packages stopped at 9.6.
+- name: Install PostgreSQL
+  ansible.builtin.apt:
+    name: "postgresql-{{ postgresql_version }}"
+    state: present
+    update_cache: true
+
+- name: Ensure PostgreSQL conf.d directory exists
+  ansible.builtin.file:
+    path: "{{ postgresql_conf_d }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0750"
+
+- name: Deploy PostgreSQL tuning config
+  ansible.builtin.template:
+    src: tuning.conf.j2
+    dest: "{{ postgresql_conf_d }}/tuning.conf"
+    owner: postgres
+    group: postgres
+    mode: "0640"
+  notify: Restart postgresql
+
+# blockinfile rather than a full template, so the distribution's default local
+# and peer rules survive. Absent when the list is empty, so the default is a no-op.
+- name: Manage pg_hba entries
+  ansible.builtin.blockinfile:
+    path: "{{ postgresql_hba_file }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK — specsnl.specsops.postgresql"
+    state: "{{ 'present' if postgresql_hba_entries | length > 0 else 'absent' }}"
+    block: |
+      {% for entry in postgresql_hba_entries %}
+      {{ entry.type }}	{{ entry.database }}	{{ entry.user }}	{{ entry.address | default('') }}	{{ entry.method }}
+      {% endfor %}
+    owner: postgres
+    group: postgres
+    mode: "0640"
+  notify: Restart postgresql
+
+- name: Enable PostgreSQL service
+  ansible.builtin.systemd_service:
+    name: postgresql
+    enabled: true
+    state: "{{ 'started' if not postgresql_in_container else omit }}"
+
+# Opening the port while the server listens on loopback only would be
+# misleading, so the rule follows listen_addresses.
+- name: Decide whether a firewall rule is wanted
+  ansible.builtin.set_fact:
+    postgresql_firewall_wanted: >-
+      {{ postgresql_manage_firewall
+         and not (postgresql_in_container | bool)
+         and postgresql_listen_addresses not in ['localhost', '127.0.0.1', '::1'] }}
+
+# This role does not depend on the firewall role, so ufw may simply not be here.
+# Failing at this point would leave PostgreSQL already listening off-loopback.
+- name: Check whether ufw is installed
+  ansible.builtin.stat:
+    path: /usr/sbin/ufw
+  register: postgresql_ufw
+  when: postgresql_firewall_wanted | bool
+
+- name: Warn that the PostgreSQL port was left closed
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: ufw is not installed, so {{ postgresql_port }}/tcp was not opened
+      while PostgreSQL listens on '{{ postgresql_listen_addresses }}'. Run the
+      specsnl.specsops.firewall role first, or set postgresql_manage_firewall to
+      false and manage the rule yourself.
+  when:
+    - postgresql_firewall_wanted | bool
+    - not postgresql_ufw.stat.exists
+
+- name: Allow PostgreSQL port through firewall
+  community.general.ufw:
+    rule: allow
+    port: "{{ postgresql_port | string }}"
+    proto: tcp
+  when:
+    - postgresql_firewall_wanted | bool
+    - postgresql_ufw.stat.exists

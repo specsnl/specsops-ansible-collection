@@ -1,0 +1,42 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+        manager: apt
+
+    - name: Assert ufw is installed
+      ansible.builtin.assert:
+        that: "'ufw' in ansible_facts.packages"
+        fail_msg: "ufw is not installed"
+
+    - name: Check ufw status
+      ansible.builtin.command: ufw status verbose
+      register: ufw_status
+      changed_when: false
+
+    - name: Read ufw defaults configuration
+      ansible.builtin.slurp:
+        src: /etc/default/ufw
+      register: ufw_defaults_raw
+
+    - name: Assert ufw default deny incoming is configured
+      ansible.builtin.assert:
+        that: >-
+          ('Default: deny (incoming)' in ufw_status.stdout) or
+          ('DEFAULT_INPUT_POLICY="DROP"' in (ufw_defaults_raw.content | b64decode))
+        fail_msg: "ufw default incoming is not set to deny"
+
+    - name: Check ufw added rules
+      ansible.builtin.command: ufw show added
+      register: ufw_added_rules
+      changed_when: false
+
+    - name: Assert SSH rule is present
+      ansible.builtin.assert:
+        that: >-
+          ('22/tcp' in ufw_status.stdout or '22 ' in ufw_status.stdout) or
+          ('22/tcp' in ufw_added_rules.stdout or '22 ' in ufw_added_rules.stdout)
+        fail_msg: "SSH rule (port 22) not found in ufw rules"

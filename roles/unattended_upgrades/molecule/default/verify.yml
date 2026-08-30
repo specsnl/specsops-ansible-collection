@@ -1,0 +1,66 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+        manager: apt
+
+    - name: Assert unattended-upgrades is installed
+      ansible.builtin.assert:
+        that: "'unattended-upgrades' in ansible_facts.packages"
+        fail_msg: "unattended-upgrades is not installed"
+
+    - name: Assert chrony is installed
+      ansible.builtin.assert:
+        that: "'chrony' in ansible_facts.packages"
+        fail_msg: "chrony is not installed"
+
+    - name: Stat 20auto-upgrades config
+      ansible.builtin.stat:
+        path: /etc/apt/apt.conf.d/20auto-upgrades
+      register: auto_upgrades_file
+
+    - name: Assert 20auto-upgrades exists
+      ansible.builtin.assert:
+        that: auto_upgrades_file.stat.exists
+        fail_msg: "/etc/apt/apt.conf.d/20auto-upgrades does not exist"
+
+    - name: Read 20auto-upgrades
+      ansible.builtin.slurp:
+        src: /etc/apt/apt.conf.d/20auto-upgrades
+      register: auto_upgrades_content
+
+    - name: Stat 50unattended-upgrades config
+      ansible.builtin.stat:
+        path: /etc/apt/apt.conf.d/50unattended-upgrades
+      register: unattended_upgrades_file
+
+    - name: Assert 50unattended-upgrades exists
+      ansible.builtin.assert:
+        that: unattended_upgrades_file.stat.exists
+        fail_msg: "/etc/apt/apt.conf.d/50unattended-upgrades does not exist"
+
+    - name: Read 50unattended-upgrades
+      ansible.builtin.slurp:
+        src: /etc/apt/apt.conf.d/50unattended-upgrades
+      register: uu_content
+
+    - name: Assert apt periodic settings are enabled
+      ansible.builtin.assert:
+        that:
+          - "'APT::Periodic::Update-Package-Lists \"1\";' in (auto_upgrades_content.content | b64decode)"
+          - "'APT::Periodic::Download-Upgradeable-Packages \"1\";' in (auto_upgrades_content.content | b64decode)"
+          - "'APT::Periodic::AutocleanInterval \"7\";' in (auto_upgrades_content.content | b64decode)"
+          - "'APT::Periodic::Unattended-Upgrade \"1\";' in (auto_upgrades_content.content | b64decode)"
+        fail_msg: "apt periodic settings are not enabled in 20auto-upgrades"
+
+    - name: Assert unattended-upgrades settings are configured
+      ansible.builtin.assert:
+        that:
+          - "'\"${distro_id}:${distro_codename}-security\";' in (uu_content.content | b64decode)"
+          - "'Unattended-Upgrade::AutoFixInterruptedDpkg \"true\";' in (uu_content.content | b64decode)"
+          - "'Unattended-Upgrade::MinimalSteps \"true\";' in (uu_content.content | b64decode)"
+          - "'Unattended-Upgrade::Remove-Unused-Dependencies \"true\";' in (uu_content.content | b64decode)"
+        fail_msg: "50unattended-upgrades does not match the expected configuration"

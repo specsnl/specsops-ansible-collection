@@ -1,0 +1,35 @@
+name: Tags
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Build & Publish to Ansible Galaxy
+    runs-on: ubuntu-24.04
+    container: ghcr.io/specsnl/ansible:1.13.0
+    steps:
+      - uses: actions/checkout@v6
+      - name: Assert tag matches galaxy.yml version
+        run: |
+          GALAXY_VERSION="v$(grep '^version:' galaxy.yml | awk '{print $2}')"
+          if [ "$GALAXY_VERSION" != "${{ github.ref_name }}" ]; then
+            echo "Tag ${{ github.ref_name }} does not match galaxy.yml version $GALAXY_VERSION"
+            exit 1
+          fi
+      - name: Build collection
+        run: ansible-galaxy collection build --output-path ./dist
+      - name: Publish to Ansible Galaxy
+        run: |
+          VERSION="${{ github.ref_name }}"
+          ansible-galaxy collection publish "./dist/specsnl-specsops-${VERSION#v}.tar.gz" \
+            --api-key "${{ secrets.GALAXY_API_KEY }}"

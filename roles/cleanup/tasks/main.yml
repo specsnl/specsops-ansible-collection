@@ -1,0 +1,30 @@
+---
+- name: Remove unused packages
+  ansible.builtin.apt:
+    autoremove: true
+    purge: true
+
+- name: Clean apt cache
+  ansible.builtin.apt:
+    clean: true
+  changed_when: false
+
+- name: Wipe temp directory contents
+  ansible.builtin.find:
+    paths: "{{ item }}"
+    file_type: any
+    recurse: false
+    # Trailing slashes normalised: a '/var/lib/apt/lists/' entry in cleanup_paths
+    # would otherwise miss the guard and take apt's lock and partial dir with it.
+    excludes: >-
+      {{ ['lock', 'partial', 'auxfiles']
+         if (item | regex_replace('/+$', '')) == '/var/lib/apt/lists' else [] }}
+  register: cleanup_tmp_contents
+  loop: "{{ cleanup_paths }}"
+
+- name: Delete found temp files and directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ cleanup_tmp_contents.results | map(attribute='files') | flatten }}"
+  when: cleanup_tmp_contents.results | map(attribute='files') | flatten | length > 0

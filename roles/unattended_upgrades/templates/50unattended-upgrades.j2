@@ -1,0 +1,8 @@
+Unattended-Upgrade::Allowed-Origins {
+{% for origin in unattended_upgrades_allowed_origins %}
+  "{{ origin }}";
+{% endfor %}
+};
+Unattended-Upgrade::AutoFixInterruptedDpkg "{{ unattended_upgrades_autofix_dpkg }}";
+Unattended-Upgrade::MinimalSteps "{{ unattended_upgrades_minimal_steps }}";
+Unattended-Upgrade::Remove-Unused-Dependencies "{{ unattended_upgrades_remove_unused }}";

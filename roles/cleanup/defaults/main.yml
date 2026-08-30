@@ -1,0 +1,5 @@
+---
+cleanup_paths:
+  - /tmp
+  - /var/tmp
+  - /var/lib/apt/lists

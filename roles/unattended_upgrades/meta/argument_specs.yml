@@ -1,0 +1,52 @@
+---
+argument_specs:
+  main:
+    short_description: Automatic security updates
+    description: Installs unattended-upgrades and chrony; deploys apt periodic and upgrade config.
+    options:
+      unattended_upgrades_packages:
+        type: list
+        elements: str
+        description: Packages to install.
+      unattended_upgrades_periodic_update:
+        type: str
+        default: "1"
+        description: APT::Periodic::Update-Package-Lists value.
+      unattended_upgrades_periodic_download:
+        type: str
+        default: "1"
+        description: APT::Periodic::Download-Upgradeable-Packages value.
+      unattended_upgrades_periodic_unattended:
+        type: str
+        default: "1"
+        description: APT::Periodic::Unattended-Upgrade value.
+      unattended_upgrades_autoclean_interval:
+        type: str
+        default: "7"
+        description: >-
+          APT::Periodic::AutocleanInterval value, in days. Without it /var/cache/apt
+          grows unbounded on long-lived hosts.
+      unattended_upgrades_allowed_origins:
+        type: list
+        elements: str
+        description: >-
+          Origins from which unattended upgrades are allowed. Defaults to the
+          distribution security pocket plus Ubuntu's ESMApps/ESM origins; because
+          this role replaces 50unattended-upgrades, omitting the ESM entries turns
+          off ESM security updates on Ubuntu Pro hosts.
+      unattended_upgrades_autofix_dpkg:
+        type: str
+        default: "true"
+        description: Unattended-Upgrade::AutoFixInterruptedDpkg value.
+      unattended_upgrades_minimal_steps:
+        type: str
+        default: "true"
+        description: Unattended-Upgrade::MinimalSteps value.
+      unattended_upgrades_remove_unused:
+        type: str
+        default: "true"
+        description: Unattended-Upgrade::Remove-Unused-Dependencies value.
+      unattended_upgrades_chrony_enabled:
+        type: bool
+        default: true
+        description: Whether to enable and start chrony.

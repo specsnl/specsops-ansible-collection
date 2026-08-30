@@ -1,0 +1,52 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+        manager: apt
+
+    - name: Assert fail2ban is installed
+      ansible.builtin.assert:
+        that: "'fail2ban' in ansible_facts.packages"
+        fail_msg: "fail2ban is not installed"
+
+    - name: Stat sshd hardening drop-in
+      ansible.builtin.stat:
+        path: /etc/ssh/sshd_config.d/00-hardening.conf
+      register: sshd_dropin
+
+    - name: Assert sshd drop-in exists
+      ansible.builtin.assert:
+        that: sshd_dropin.stat.exists
+        fail_msg: "/etc/ssh/sshd_config.d/00-hardening.conf does not exist"
+
+    - name: Stat the superseded 99- drop-in
+      ansible.builtin.stat:
+        path: /etc/ssh/sshd_config.d/99-hardening.conf
+      register: sshd_dropin_legacy
+
+    - name: Assert the superseded 99- drop-in was removed
+      ansible.builtin.assert:
+        that: not sshd_dropin_legacy.stat.exists
+        fail_msg: "/etc/ssh/sshd_config.d/99-hardening.conf should have been removed"
+
+    # The file contents are not the thing that matters — sshd's Include is
+    # first-match-wins, so a correctly written drop-in can still be inert.
+    # Assert on the effective configuration instead.
+    - name: Dump the effective sshd configuration
+      ansible.builtin.command: /usr/sbin/sshd -T
+      register: sshd_effective
+      changed_when: false
+
+    - name: Assert sshd hardening settings are in effect
+      ansible.builtin.assert:
+        that:
+          - "'passwordauthentication no' in sshd_effective.stdout_lines"
+          - "'permitrootlogin no' in sshd_effective.stdout_lines"
+          - "'maxauthtries 3' in sshd_effective.stdout_lines"
+          - "'kbdinteractiveauthentication no' in sshd_effective.stdout_lines"
+        fail_msg: >-
+          sshd hardening settings are not in effect. A higher-numbered drop-in is
+          most likely losing to /etc/ssh/sshd_config.d/50-cloud-init.conf.

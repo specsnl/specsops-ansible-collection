@@ -1,0 +1,60 @@
+---
+- name: Install logrotate
+  ansible.builtin.apt:
+    name: logrotate
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+# Anchored before the include: global options set after it do not apply to the
+# jobs it pulls in, so an appended directive would be a silent no-op.
+- name: Set global logrotate maxsize
+  ansible.builtin.lineinfile:
+    path: /etc/logrotate.conf
+    regexp: '^#?\s*maxsize\s'
+    line: "maxsize {{ logrotate_maxsize }}"
+    insertbefore: '^\s*include\s'
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Set global logrotate compression
+  ansible.builtin.lineinfile:
+    path: /etc/logrotate.conf
+    regexp: '^#?\s*compress\s*$'
+    line: "{{ 'compress' if logrotate_compress else '#compress' }}"
+    insertbefore: '^\s*include\s'
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Stat per-file override targets
+  ansible.builtin.stat:
+    path: "{{ item.key }}"
+  register: logrotate_override_files
+  loop: "{{ logrotate_file_overrides | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+# Anchored on every stanza's opening brace. lineinfile would only reach the last
+# match in the file, leaving earlier stanzas (/etc/logrotate.d/apt has two)
+# without the override. The lookahead keeps it idempotent.
+- name: Insert per-file maxsize overrides
+  ansible.builtin.replace:
+    path: "{{ item.item.key }}"
+    regexp: '^(\S.*\{)[ \t]*\n(?![ \t]*maxsize[ \t])'
+    replace: "\\1\n    maxsize {{ item.item.value }}\n"
+  loop: "{{ logrotate_override_files.results }}"
+  loop_control:
+    label: "{{ item.item.key }}"
+  when: item.stat.exists
+
+- name: Align existing per-file maxsize directives
+  ansible.builtin.replace:
+    path: "{{ item.item.key }}"
+    regexp: '^([ \t]*)maxsize[ \t]+\S+[ \t]*$'
+    replace: '\1maxsize {{ item.item.value }}'
+  loop: "{{ logrotate_override_files.results }}"
+  loop_control:
+    label: "{{ item.item.key }}"
+  when: item.stat.exists

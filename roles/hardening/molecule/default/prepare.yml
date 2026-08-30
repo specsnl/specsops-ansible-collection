@@ -1,0 +1,30 @@
+---
+- name: Prepare
+  hosts: all
+  become: true
+  tasks:
+    # Real Specs hosts (Ubuntu cloud images) ship openssh-server; the test image
+    # does not, and the role's sshd -t validation needs the binary present.
+    - name: Install openssh-server
+      ansible.builtin.apt:
+        name: openssh-server
+        state: present
+        update_cache: true
+
+    # Also generates host keys and /run/sshd, both of which sshd -t requires.
+    - name: Start sshd
+      ansible.builtin.systemd_service:
+        name: ssh
+        state: started
+
+    # Ubuntu cloud images ship this file. sshd's Include is first-match-wins, so
+    # it is what a too-highly-numbered hardening drop-in silently loses to.
+    - name: Reproduce the cloud-init sshd drop-in
+      ansible.builtin.copy:
+        content: |
+          # Created by cloud-init
+          PasswordAuthentication yes
+        dest: /etc/ssh/sshd_config.d/50-cloud-init.conf
+        owner: root
+        group: root
+        mode: "0644"

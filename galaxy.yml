@@ -1,0 +1,57 @@
+---
+namespace: specsnl
+name: specsops
+version: 0.1.0
+readme: README.md
+authors:
+  - Ilyes Ahidar <ilyes@specs.nl>
+description: >-
+  Ansible roles for provisioning and hardening Specs Ubuntu 24.04 hosts:
+  base system, hardening, firewall, unattended upgrades, swap, log rotation,
+  and PostgreSQL.
+license:
+  - MIT
+tags:
+  - specsnl
+  - specsops
+  - ubuntu
+  - noble
+  - hardening
+  - postgresql
+  - firewall
+  - swap
+  - logrotate
+  - logging
+  - system
+  - infrastructure
+  - linux
+  - security
+  - database
+dependencies:
+  community.general: ">=8.0.0,<14.0.0"
+  ansible.posix: ">=1.5.0,<3.0.0"
+repository: https://github.com/specsnl/specsops-ansible-collection
+documentation: https://github.com/specsnl/specsops-ansible-collection
+homepage: https://github.com/specsnl/specsops-ansible-collection
+issues: https://github.com/specsnl/specsops-ansible-collection/issues
+build_ignore:
+  - .github
+  - .gitignore
+  - .editorconfig
+  - .yamllint
+  - .ansible-lint
+  - Taskfile.dist.yml
+  - Taskfile.yml
+  - requirements.yml
+  - ansible.cfg
+  - molecule
+  - roles/*/molecule
+  - changelogs/fragments
+  - changelogs/config.yaml
+  - dist
+  - "*.tar.gz"
+  - plans
+  - collections
+  - .ansible
+  - .DS_Store
+  - compose.yml

@@ -1,0 +1,8 @@
+# Managed by Ansible — specsnl.specsops.postgresql
+listen_addresses = '{{ postgresql_listen_addresses }}'
+port = {{ postgresql_port }}
+timezone = '{{ postgresql_timezone }}'
+log_timezone = '{{ postgresql_timezone }}'
+{% for key, value in postgresql_tuning.items() %}
+{{ key }} = {{ value }}
+{% endfor %}

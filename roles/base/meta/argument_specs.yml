@@ -1,0 +1,62 @@
+---
+argument_specs:
+  main:
+    short_description: Base system setup
+    description: apt update/upgrade, core packages, locale, timezone, sysctl tuning.
+    options:
+      base_packages:
+        type: list
+        elements: str
+        description: Packages to install.
+      base_apt_upgrade:
+        type: str
+        default: dist
+        description: apt upgrade type passed to the apt module (dist, full, safe, yes, no).
+      base_apt_cache_valid_time:
+        type: int
+        default: 3600
+        description: Cache validity in seconds before forcing an apt update.
+      base_apt_dpkg_options:
+        type: str
+        default: force-confdef,force-confold
+        description: >-
+          dpkg options for the upgrade task. Keeps existing conffiles instead of
+          prompting, which would hang an unattended run.
+      base_apt_lock_timeout:
+        type: int
+        default: 300
+        description: >-
+          Seconds apt/dpkg wait for a held lock, written to
+          /etc/apt/apt.conf.d/90lock-timeout. Avoids racing unattended-upgrades
+          on freshly booted hosts.
+      base_needrestart_automatic:
+        type: bool
+        default: true
+        description: >-
+          Drop in $nrconf{restart} = 'a' so needrestart restarts services without
+          an interactive prompt during apt upgrades.
+      base_prefer_ipv4:
+        type: bool
+        default: false
+        description: >-
+          Uncomment the IPv4 precedence rule in /etc/gai.conf. Opt-in; only useful
+          on hosts with broken or absent IPv6.
+      base_locale:
+        type: str
+        default: en_US.UTF-8
+        description: Locale to generate.
+      base_lang:
+        type: str
+        default: en_US.UTF-8
+        description: Value written to LANG in /etc/default/locale.
+      base_timezone:
+        type: str
+        default: UTC
+        description: Timezone to configure (e.g. UTC, Europe/Amsterdam).
+      base_sysctl_file:
+        type: str
+        default: /etc/sysctl.d/99-base.conf
+        description: Path to the sysctl drop-in file.
+      base_sysctl:
+        type: dict
+        description: Map of sysctl key/value pairs to apply.

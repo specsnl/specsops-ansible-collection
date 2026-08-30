@@ -1,0 +1,35 @@
+---
+argument_specs:
+  main:
+    short_description: Swap file provisioning
+    description: >-
+      Creates a swap file, formats it, persists it in fstab, activates it, and applies
+      the related sysctl tuning. Skipped in containers and on hosts that already have
+      swap the role does not own.
+    options:
+      swap_enabled:
+        type: bool
+        default: true
+        description: Whether to manage swap at all. The sysctl drop-in is also gated on this.
+      swap_file_path:
+        type: str
+        default: /swapfile
+        description: Path to the swap file.
+      swap_size:
+        type: str
+        default: 1G
+        description: Size of the swap file, as accepted by community.general.filesize.
+      swap_sysctl_file:
+        type: str
+        default: /etc/sysctl.d/99-swap.conf
+        description: Path to the sysctl drop-in file.
+      swap_swappiness:
+        type: str
+        default: "30"
+        description: >-
+          vm.swappiness value. Overlaps with base_sysctl.vm.swappiness in the base
+          role — set it in one place, not both.
+      swap_vfs_cache_pressure:
+        type: str
+        default: "50"
+        description: vm.vfs_cache_pressure value.

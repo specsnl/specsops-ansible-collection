@@ -1,0 +1,108 @@
+---
+# stat, not a fileglob lookup: lookups run on the controller, which is itself a
+# container here, and would mark every target — real VMs included — as one.
+- name: Stat container marker files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: swap_container_markers
+  loop:
+    - /.dockerenv
+    - /run/.containerenv
+  when: swap_in_container is not defined
+
+- name: Detect container environment
+  ansible.builtin.set_fact:
+    swap_in_container: >-
+      {{ (ansible_facts['virtualization_type'] | default('') in
+          ['docker', 'container', 'containerd', 'podman', 'lxc'])
+         or (swap_container_markers.results
+             | selectattr('stat.exists') | list | length > 0) }}
+  when: swap_in_container is not defined
+
+- name: Stat swap file
+  ansible.builtin.stat:
+    path: "{{ swap_file_path }}"
+  register: swap_file
+
+# Manage swap only when the role owns it. A host that already has vendor swap
+# (and no file of ours) is left alone rather than given a second swap area.
+- name: Decide whether to manage swap
+  ansible.builtin.set_fact:
+    swap_manage: >-
+      {{ swap_enabled
+         and not (swap_in_container | bool)
+         and (swap_file.stat.exists or ansible_facts['swaptotal_mb'] | default(0) | int == 0) }}
+
+- name: Create swap file
+  community.general.filesize:
+    path: "{{ swap_file_path }}"
+    size: "{{ swap_size }}"
+    sparse: false
+    owner: root
+    group: root
+    mode: "0600"
+  register: swap_file_created
+  when: swap_manage
+
+# A file that already existed but was never mkswap'd reports no change from
+# filesize, so the signature — not the create result alone — decides.
+- name: Probe swap file signature
+  ansible.builtin.command: "blkid -p -s TYPE -o value {{ swap_file_path }}"
+  register: swap_file_signature
+  changed_when: false
+  failed_when: false
+  when: swap_manage
+
+- name: Format swap file
+  ansible.builtin.command: "mkswap {{ swap_file_path }}"
+  when:
+    - swap_manage
+    - swap_file_created.changed or (swap_file_signature.stdout | default('') | trim) != 'swap'
+  changed_when: true
+
+- name: Read active swap areas
+  ansible.builtin.slurp:
+    src: /proc/swaps
+  register: swap_proc
+  when: swap_manage
+
+# First field only. A substring test would let /swap match an active /swapfile.
+- name: Collect active swap devices
+  ansible.builtin.set_fact:
+    swap_active_devices: >-
+      {{ (swap_proc.content | b64decode).splitlines()[1:]
+         | map('regex_replace', '\s.*$', '') | list }}
+  when: swap_manage
+
+- name: Activate swap file
+  ansible.builtin.command: "swapon {{ swap_file_path }}"
+  when:
+    - swap_manage
+    - swap_file_path not in swap_active_devices
+  changed_when: true
+
+# Last, so a file that failed to format or activate never reaches fstab and
+# takes swap.target — and the boot — down with it.
+- name: Add swap file to fstab
+  ansible.posix.mount:
+    path: none
+    src: "{{ swap_file_path }}"
+    fstype: swap
+    opts: sw
+    state: present
+  when: swap_manage
+
+# Written even in containers so the drop-in is testable; only applied live
+# where the kernel is actually ours to tune.
+- name: Apply swap sysctl settings
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: "{{ swap_sysctl_file }}"
+    reload: "{{ not (swap_in_container | bool) }}"
+    sysctl_set: "{{ not (swap_in_container | bool) }}"
+    state: present
+  loop:
+    - { key: vm.swappiness, value: "{{ swap_swappiness }}" }
+    - { key: vm.vfs_cache_pressure, value: "{{ swap_vfs_cache_pressure }}" }
+  when: swap_enabled

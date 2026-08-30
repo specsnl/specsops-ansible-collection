@@ -1,0 +1,24 @@
+---
+unattended_upgrades_packages:
+  - unattended-upgrades
+  - chrony
+
+unattended_upgrades_periodic_update: "1"
+unattended_upgrades_periodic_download: "1"
+unattended_upgrades_periodic_unattended: "1"
+# Without this /var/cache/apt grows unbounded on long-lived hosts.
+unattended_upgrades_autoclean_interval: "7"
+
+# This role owns 50unattended-upgrades outright, so the ESM origins shipped by
+# Ubuntu have to be carried over here — dropping them silently stops security
+# updates on Ubuntu Pro hosts. They never match on non-Ubuntu, where they are inert.
+unattended_upgrades_allowed_origins:
+  - "${distro_id}:${distro_codename}-security"
+  - "${distro_id}ESMApps:${distro_codename}-apps-security"
+  - "${distro_id}ESM:${distro_codename}-infra-security"
+
+unattended_upgrades_autofix_dpkg: "true"
+unattended_upgrades_minimal_steps: "true"
+unattended_upgrades_remove_unused: "true"
+
+unattended_upgrades_chrony_enabled: true

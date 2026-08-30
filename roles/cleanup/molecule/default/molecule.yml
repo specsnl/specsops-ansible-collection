@@ -1,0 +1,56 @@
+---
+dependency:
+  name: galaxy
+  options:
+    requirements-file: ../../../../requirements.yml
+
+driver:
+  name: docker
+
+platforms:
+  - name: ubuntu2404
+    image: geerlingguy/docker-ubuntu2404-ansible@sha256:6bbfbb5367ab236855229048735716e47c4640e38b1ec62b7ddbfb904ec36684
+    pre_build_image: true
+    command: /usr/lib/systemd/systemd
+    privileged: true
+    cgroupns_mode: host
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    tmpfs:
+      - /run
+      - /tmp
+    capabilities:
+      - SYS_ADMIN
+
+provisioner:
+  name: ansible
+  config_options:
+    defaults:
+      pipelining: true
+
+verifier:
+  name: ansible
+
+scenario:
+  test_sequence:
+    # - dependency  # handled by Taskfile before molecule runs
+    # - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - idempotence
+    # - side_effect
+    - verify
+    # - cleanup
+    - destroy
+  converge_sequence:
+    # - dependency  # handled by Taskfile before molecule runs
+    - create
+    # - prepare
+    - converge
+  destroy_sequence:
+    # - dependency  # handled by Taskfile before molecule runs
+    # - cleanup
+    - destroy

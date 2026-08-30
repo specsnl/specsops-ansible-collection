@@ -1,0 +1,27 @@
+---
+postgresql_version: 18
+postgresql_port: 5432
+
+postgresql_pgdg_key_url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+
+# Loopback-only by default. Change this to '*' (or a specific address) to accept
+# remote connections — the firewall rule below is gated on it.
+postgresql_listen_addresses: localhost
+
+postgresql_timezone: UTC
+
+# Only opens the port when the server actually listens off-loopback.
+postgresql_manage_firewall: true
+
+# Appended to pg_hba.conf inside an Ansible-managed marker block, leaving the
+# distribution's default local/peer rules intact. Each entry is a dict with
+# type, database, user, address (optional for local) and method.
+postgresql_hba_entries: []
+
+postgresql_tuning:
+  shared_buffers: 256MB
+  effective_cache_size: 1GB
+  work_mem: 4MB
+  maintenance_work_mem: 64MB
+  max_connections: 100
+  logging_collector: "on"

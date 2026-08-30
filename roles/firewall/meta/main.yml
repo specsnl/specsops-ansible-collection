@@ -1,0 +1,19 @@
+---
+galaxy_info:
+  role_name: firewall
+  namespace: specsnl
+  author: Ilyes Ahidar
+  description: ufw firewall baseline — default deny incoming, allow outgoing, configurable rules
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble
+  galaxy_tags:
+    - ubuntu
+    - noble
+    - firewall
+    - ufw
+    - security
+dependencies: []

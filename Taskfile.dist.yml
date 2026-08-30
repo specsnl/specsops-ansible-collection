@@ -1,0 +1,167 @@
+# https://taskfile.dev
+version: "3"
+
+vars:
+  COLLECTION_NS: specsnl
+  COLLECTION_NAME: specsops
+  DIST_DIR: ./dist
+  ROLES:
+    - base
+    - firewall
+    - hardening
+    - unattended_upgrades
+    - postgresql
+    - swap
+    - logrotate
+    - cleanup
+
+silent: true
+
+tasks:
+
+  dc:run:non-interactive:*:
+    vars:
+      SERVICE: '{{ index .MATCH 0 }}'
+    cmds:
+      - |-
+        docker compose run --rm --quiet --no-TTY {{ .SERVICE }} /bin/bash <<'EOF'
+          {{ .SUB_CMD }}
+          {{ .CLI_ARGS }}
+        EOF
+
+  dc:run:*:
+    interactive: true
+    vars:
+      SERVICE: '{{ index .MATCH 0 }}'
+    cmds:
+      - docker compose run --rm --quiet {{ .SERVICE }} /bin/bash -c '{{ .SUB_CMD }} {{ .CLI_ARGS }}'
+
+  shell:
+    desc: Run ansible shell command
+    cmds:
+      - docker compose run --rm --quiet --interactive ansible /bin/bash
+
+  ansible:lint:
+    desc: Run yamllint + ansible-lint
+    cmds:
+      - task: ansible:lint:yaml
+      - task: ansible:lint:ansible
+
+  ansible:lint:yaml:
+    desc: Run yamllint
+    cmds:
+      - task: dc:run:ansible
+        vars: { SUB_CMD: yamllint . }
+
+  ansible:lint:ansible:
+    desc: Run ansible-lint
+    cmds:
+      - task: dc:run:ansible
+        vars: { SUB_CMD: ansible-lint }
+
+  ansible:lint:ansible:fix:
+    desc: Auto-fix lint issues where possible
+    cmds:
+      - task: dc:run:ansible
+        vars: { SUB_CMD: ansible-lint --fix }
+
+  ansible:test:
+    desc: Run molecule test for all roles
+    cmds:
+      - for: { var: ROLES }
+        task: ansible:test:{{.ITEM}}
+
+  ansible:test:*:
+    desc: Run molecule test for a single role (e.g. task ansible:test:postgresql)
+    vars:
+      ROLE: "{{index .MATCH 0}}"
+    cmds:
+      - task: _molecule
+        vars: { ROLE: "{{.ROLE}}", CMD: test }
+
+  ansible:converge:*:
+    desc: Molecule converge (no destroy) for a role
+    vars:
+      ROLE: "{{index .MATCH 0}}"
+    cmds:
+      - task: _molecule
+        vars: { ROLE: "{{.ROLE}}", CMD: converge }
+
+  ansible:verify:*:
+    desc: Molecule verify for a role
+    vars:
+      ROLE: "{{index .MATCH 0}}"
+    cmds:
+      - task: _molecule
+        vars: { ROLE: "{{.ROLE}}", CMD: verify }
+
+  ansible:destroy:*:
+    desc: Molecule destroy for a role
+    vars:
+      ROLE: "{{index .MATCH 0}}"
+    cmds:
+      - task: _molecule
+        vars: { ROLE: "{{.ROLE}}", CMD: destroy }
+
+  _molecule:
+    internal: true
+    requires:
+       vars: [CMD, ROLE]
+    cmds:
+      - task: dc:run:non-interactive:ansible
+        vars:
+            SUB_CMD: |-
+              ansible-galaxy collection install --requirements-file requirements.yml
+              ansible-galaxy collection install . --force
+              cd roles/{{.ROLE}}
+              molecule {{.CMD}}
+
+  md:checkstyle:
+    desc: Check style of Markdown files
+    cmds:
+      - docker compose run --rm --quiet markdown-linter {{.SUB_CMD}} {{.CLI_ARGS}}
+
+  md:fixstyle:
+    desc: Fix style of Markdown files (tables + markdownlint --fix)
+    cmds:
+      - task: md:fix-tables
+      - task: md:checkstyle
+        vars: { SUB_CMD: --fix }
+
+  md:fix-tables:
+    desc: Fix table spacing in Markdown files
+    cmds:
+      - docker compose run --rm --quiet markdown-table-formatter
+
+  galaxy:build:
+    desc: Build the collection tarball
+    cmds:
+      - mkdir -p {{.DIST_DIR}}
+      - task: dc:run:ansible
+        vars:
+          SUB_CMD: ansible-galaxy collection build --output-path {{.DIST_DIR}} --force
+
+  galaxy:install:local:
+    desc: Build and install the collection (inside the Ansible container)
+    deps: [galaxy:build]
+    cmds:
+      - task: dc:run:ansible
+        vars:
+          SUB_CMD: ansible-galaxy collection install {{.DIST_DIR}}/{{.COLLECTION_NS}}-{{.COLLECTION_NAME}}-*.tar.gz --force
+
+  galaxy:publish:
+    desc: Publish to Ansible Galaxy (requires GALAXY_API_KEY env var)
+    deps: [galaxy:build]
+    cmds:
+      - task: dc:run:ansible
+        vars:
+          SUB_CMD: ansible-galaxy collection publish {{.DIST_DIR}}/{{.COLLECTION_NS}}-{{.COLLECTION_NAME}}-*.tar.gz --api-key "$GALAXY_API_KEY"
+
+  changelog:release:*:
+    desc: Cut a changelog release (e.g. task changelog:release:0.2.0)
+    vars:
+      VERSION: "{{index .MATCH 0}}"
+    cmds:
+      - task: dc:run:ansible
+        vars:
+          SUB_CMD: antsibull-changelog release --version {{.VERSION}}
