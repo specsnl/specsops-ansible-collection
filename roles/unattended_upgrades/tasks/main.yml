@@ -1,10 +1,22 @@
 ---
+# stat, not a fileglob lookup: lookups run on the controller, which is itself a
+# container here, and would mark every target — real VMs included — as one.
+- name: Stat container marker files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: unattended_upgrades_container_markers
+  loop:
+    - /.dockerenv
+    - /run/.containerenv
+  when: unattended_upgrades_in_container is not defined
+
 - name: Detect container environment
   ansible.builtin.set_fact:
     unattended_upgrades_in_container: >-
       {{ (ansible_facts['virtualization_type'] | default('') in
           ['docker', 'container', 'containerd', 'podman', 'lxc'])
-         or (lookup('ansible.builtin.fileglob', '/.dockerenv') | length > 0) }}
+         or (unattended_upgrades_container_markers.results
+             | selectattr('stat.exists') | list | length > 0) }}
   when: unattended_upgrades_in_container is not defined
 
 - name: Install unattended-upgrades and chrony

@@ -24,10 +24,6 @@ platforms:
 
 provisioner:
   name: ansible
-  inventory:
-    host_vars:
-      ubuntu2404:
-        unattended_upgrades_in_container: true
 
 verifier:
   name: ansible

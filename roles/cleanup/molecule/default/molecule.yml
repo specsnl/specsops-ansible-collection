@@ -27,10 +27,6 @@ provisioner:
   config_options:
     defaults:
       pipelining: true
-  inventory:
-    host_vars:
-      ubuntu2404:
-        cleanup_in_container: true
 
 verifier:
   name: ansible

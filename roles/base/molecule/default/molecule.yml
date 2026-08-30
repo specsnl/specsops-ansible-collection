@@ -27,7 +27,6 @@ provisioner:
   inventory:
     host_vars:
       ubuntu2404:
-        base_in_container: true
         base_apt_cache_valid_time: 0
 
 verifier:

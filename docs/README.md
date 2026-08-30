@@ -30,7 +30,9 @@ the system that runs is the system that was tested.
 
 Roles that touch systemd services, swap or the firewall detect container environments and
 skip the steps that are not container-compatible (`ufw enable`, `systemctl start`,
-`swapon`, `sysctl reload`). Each such role derives its own `<role>_in_container` fact and
+`swapon`, `sysctl reload`). Detection stats `/.dockerenv` and `/run/.containerenv` on the
+**target** (a lookup would probe the controller, which is a container itself here, and
+mark every host as one). Each such role derives its own `<role>_in_container` fact and
 only when it is not already defined, so a playbook or Molecule inventory can override it —
 for example `base_in_container: true`. This lets the same roles run inside Docker/Podman
 containers during Packer builds and Molecule tests without error.
