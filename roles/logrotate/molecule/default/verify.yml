@@ -20,10 +20,19 @@
         src: /etc/logrotate.d/apt
       register: logrotate_apt
 
-    - name: Assert the per-file override was applied
+    # Counted, not just searched: /etc/logrotate.d/apt has a stanza for term.log
+    # and one for history.log, and an anchor that only reaches the last match
+    # would still satisfy a substring test.
+    - name: Assert the per-file override reached every stanza
       ansible.builtin.assert:
-        that: "'maxsize 25M' in (logrotate_apt.content | b64decode)"
-        fail_msg: "/etc/logrotate.d/apt did not receive its maxsize override"
+        that:
+          - >-
+            (logrotate_apt.content | b64decode).splitlines()
+            | select('search', '^\s*maxsize 25M\s*$') | list | length
+            == (logrotate_apt.content | b64decode).splitlines()
+               | select('search', '^\S.*\{\s*$') | list | length
+          - "'maxsize 25M' in (logrotate_apt.content | b64decode)"
+        fail_msg: "/etc/logrotate.d/apt did not receive its maxsize override in every stanza"
 
     # The real check: logrotate itself must still be able to parse the result.
     - name: Parse the full logrotate configuration
