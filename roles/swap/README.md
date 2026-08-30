@@ -1,7 +1,10 @@
 # specsnl.specsops.swap
 
 Swap file provisioning for Ubuntu 24.04: creates a non-sparse swap file, formats it,
-persists it in `/etc/fstab`, activates it, and applies the related sysctl tuning.
+activates it, persists it in `/etc/fstab`, and applies the related sysctl tuning.
+
+The `fstab` entry is written last, on purpose: a file that failed to format or
+activate must never be left referenced there, or `swap.target` fails on every boot.
 
 The `base` role sets `vm.swappiness` but nothing there ever creates swap, so on a
 cloud VM without a swap area that tunable does nothing. This role is what makes it
