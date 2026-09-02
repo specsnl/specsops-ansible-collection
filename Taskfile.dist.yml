@@ -5,6 +5,7 @@ vars:
   COLLECTION_NS: specsnl
   COLLECTION_NAME: specsops
   DIST_DIR: ./dist
+  CLEAN_KEEP: --exclude=/.env --exclude=/Taskfile.yml
   ROLES:
     - base
     - firewall
@@ -156,6 +157,24 @@ tasks:
       - task: dc:run:ansible
         vars:
           SUB_CMD: ansible-galaxy collection publish {{.DIST_DIR}}/{{.COLLECTION_NS}}-{{.COLLECTION_NAME}}-*.tar.gz --api-key "$GALAXY_API_KEY"
+
+  clean:dry-run:
+    desc: Show which untracked/ignored files a clean would remove (changes nothing)
+    cmds:
+      - echo "Would remove (dry-run), keeping {{.CLEAN_KEEP}}:"
+      - git clean --dry-run -dx {{.CLEAN_KEEP}} {{.CLI_ARGS}}
+
+  clean:
+    desc: Remove all untracked/ignored files, back to a fresh-checkout state (asks first)
+    vars:
+      CLEAN_LIST:
+        sh: git clean --dry-run -dx {{.CLEAN_KEEP}} {{.CLI_ARGS}}
+    prompt: |-
+      Permanently delete the following, keeping {{.CLEAN_KEEP}}?
+      {{.CLEAN_LIST}}
+      Remove the above files/dirs:
+    cmds:
+      - git clean --force -dx {{.CLEAN_KEEP}} {{.CLI_ARGS}}
 
   changelog:release:*:
     desc: Cut a changelog release (e.g. task changelog:release:0.2.0)
