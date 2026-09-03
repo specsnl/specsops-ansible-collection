@@ -12,6 +12,21 @@
         that: "'fail2ban' in ansible_facts.packages"
         fail_msg: "fail2ban is not installed"
 
+    - name: Assert openssh-server is installed
+      ansible.builtin.assert:
+        that: "'openssh-server' in ansible_facts.packages"
+        fail_msg: "openssh-server is not installed — the role must not rely on the image shipping it"
+
+    - name: Stat the sshd privilege separation directory
+      ansible.builtin.stat:
+        path: /run/sshd
+      register: sshd_privsep
+
+    - name: Assert the sshd privilege separation directory exists
+      ansible.builtin.assert:
+        that: sshd_privsep.stat.isdir | default(false)
+        fail_msg: "/run/sshd is missing, so `sshd -t` cannot run without the service being started"
+
     - name: Stat sshd hardening drop-in
       ansible.builtin.stat:
         path: /etc/ssh/sshd_config.d/00-hardening.conf

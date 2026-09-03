@@ -27,9 +27,32 @@
     cache_valid_time: 3600
   when: hardening_fail2ban_enabled
 
+- name: Install openssh-server
+  ansible.builtin.apt:
+    name: openssh-server
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: hardening_ssh_manage_package
+
 - name: Ensure sshd_config.d directory exists
   ansible.builtin.file:
     path: /etc/ssh/sshd_config.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# `sshd -t` loads the host keys and stats the privsep dir, so both must exist
+# before the drop-in below can be validated on a host that never booted sshd.
+- name: Ensure sshd host keys exist
+  ansible.builtin.command: ssh-keygen -A
+  args:
+    creates: /etc/ssh/ssh_host_ed25519_key
+
+- name: Ensure sshd privilege separation directory exists
+  ansible.builtin.file:
+    path: /run/sshd
     state: directory
     owner: root
     group: root

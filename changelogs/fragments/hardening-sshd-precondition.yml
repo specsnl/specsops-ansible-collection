@@ -1,0 +1,15 @@
+---
+bugfixes:
+  - >-
+    hardening - the role now installs ``openssh-server`` and creates the sshd host keys
+    and ``/run/sshd`` before deploying its drop-in. It validates the drop-in with
+    ``sshd -t``, which needs all three, but installed none of them — so the role failed
+    on any target that had not already installed and started sshd. Ubuntu cloud images
+    have, which hid the gap; minimal images used for Packer builds have not. The
+    Molecule scenario previously installed and started sshd in ``prepare.yml``, so its
+    tests passed while the role itself was not self-contained.
+
+minor_changes:
+  - >-
+    hardening - add ``hardening_ssh_manage_package`` (default ``true``) to opt out of
+    installing ``openssh-server`` when the package is managed elsewhere.
