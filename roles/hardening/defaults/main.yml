@@ -9,3 +9,5 @@ hardening_ssh_kbd_interactive_authentication: "no"
 hardening_ssh_max_auth_tries: 3
 
 hardening_fail2ban_enabled: true
+
+hardening_ssh_manage_package: true

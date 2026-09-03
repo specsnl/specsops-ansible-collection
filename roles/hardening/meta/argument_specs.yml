@@ -2,7 +2,9 @@
 argument_specs:
   main:
     short_description: OS hardening
-    description: Deploys an sshd drop-in configuration and installs fail2ban.
+    description: >-
+      Installs openssh-server, deploys an sshd drop-in configuration and installs
+      fail2ban.
     options:
       hardening_ssh_dropin_path:
         type: str
@@ -33,3 +35,10 @@ argument_specs:
         type: bool
         default: true
         description: Whether to install and enable fail2ban.
+      hardening_ssh_manage_package:
+        type: bool
+        default: true
+        description: >-
+          Whether to install openssh-server. The role validates its drop-in with
+          `sshd -t`, which needs the binary present. Set to false only when the
+          package is managed elsewhere and already installed.
