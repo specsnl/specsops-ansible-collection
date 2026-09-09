@@ -131,10 +131,15 @@ rather than editing `compose.yml`.
 2. Bump `version:` in `galaxy.yml`
 3. Run `task changelog:release:<version>` — regenerates `CHANGELOG.rst` and consumes
    the fragments
-4. Commit, tag `v<version>`, push
+4. Commit, tag `<version>`, push
+
+Tags carry no `v` prefix — `0.1.0`, not `v0.1.0` — matching the upstream Ansible
+collections. The `Tags must not have v-prefix` ruleset under
+[.github/rulesets/](.github/rulesets/) enforces this.
 
 The tag workflow asserts the tag matches `version:` in `galaxy.yml`, then builds and
-publishes to Ansible Galaxy using the `GALAXY_API_KEY` secret.
+publishes to Ansible Galaxy using the `GALAXY_API_KEY` secret. Without that secret the
+job still builds the tarball and passes, skipping only the publish step.
 
 ## CI
 

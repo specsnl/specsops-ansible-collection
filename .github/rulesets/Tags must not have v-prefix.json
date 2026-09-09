@@ -1,0 +1,24 @@
+{
+    "name": "Tags must not have v-prefix",
+    "target": "tag",
+    "source_type": "Repository",
+    "source": "specsnl/specsops-ansible-collection",
+    "enforcement": "active",
+    "conditions": {
+        "ref_name": {
+            "exclude": [],
+            "include": [
+                "refs/tags/v*"
+            ]
+        }
+    },
+    "rules": [
+        {
+            "type": "non_fast_forward"
+        },
+        {
+            "type": "creation"
+        }
+    ],
+    "bypass_actors": []
+}
