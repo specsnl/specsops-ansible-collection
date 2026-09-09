@@ -1,0 +1,9 @@
+---
+caddy_repo_key_url: https://dl.cloudsmith.io/public/caddy/stable/gpg.key
+
+caddy_http_port: 80
+caddy_https_port: 443
+
+# Skipped in containers, and when ufw is not installed — the latter warns rather
+# than failing, since Caddy is already listening by then.
+caddy_manage_firewall: true

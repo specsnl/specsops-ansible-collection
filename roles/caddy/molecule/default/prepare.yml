@@ -1,0 +1,12 @@
+---
+# Installs ufw so the "is ufw installed" guard passes, leaving the container guard
+# as the only thing that can skip the rules — which is what verify.yml asserts.
+- name: Prepare
+  hosts: all
+  become: true
+  tasks:
+    - name: Install ufw
+      ansible.builtin.apt:
+        name: ufw
+        state: present
+        update_cache: true

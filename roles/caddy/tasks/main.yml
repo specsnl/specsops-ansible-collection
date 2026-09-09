@@ -1,0 +1,94 @@
+---
+# stat, not a fileglob lookup: lookups run on the controller, which is itself a
+# container here, and would mark every target — real VMs included — as one.
+- name: Stat container marker files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: caddy_container_markers
+  loop:
+    - /.dockerenv
+    - /run/.containerenv
+  when: caddy_in_container is not defined
+
+- name: Detect container environment
+  ansible.builtin.set_fact:
+    caddy_in_container: >-
+      {{ (ansible_facts['virtualization_type'] | default('') in
+          ['docker', 'container', 'containerd', 'podman', 'lxc'])
+         or (caddy_container_markers.results
+             | selectattr('stat.exists') | list | length > 0) }}
+  when: caddy_in_container is not defined
+
+- name: Install python3-debian
+  ansible.builtin.apt:
+    name: python3-debian
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure /etc/apt/keyrings directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Add Caddy stable repository
+  ansible.builtin.deb822_repository:
+    name: caddy-stable
+    types: deb
+    uris: "https://dl.cloudsmith.io/public/caddy/stable/deb/debian"
+    suites: any-version
+    components: main
+    signed_by: "{{ caddy_repo_key_url }}"
+    state: present
+    enabled: true
+
+- name: Install Caddy
+  ansible.builtin.apt:
+    name: caddy
+    state: present
+    update_cache: true
+
+- name: Enable Caddy service
+  ansible.builtin.systemd_service:
+    name: caddy
+    enabled: true
+    state: "{{ 'started' if not caddy_in_container else omit }}"
+
+- name: Decide whether a firewall rule is wanted
+  ansible.builtin.set_fact:
+    caddy_firewall_wanted: >-
+      {{ caddy_manage_firewall and not (caddy_in_container | bool) }}
+
+# This role does not depend on the firewall role, so ufw may simply not be here.
+# Failing at this point would leave Caddy already listening.
+- name: Check whether ufw is installed
+  ansible.builtin.stat:
+    path: /usr/sbin/ufw
+  register: caddy_ufw
+  when: caddy_firewall_wanted | bool
+
+- name: Warn that the Caddy ports were left closed
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: ufw is not installed, so {{ caddy_http_port }}/tcp and
+      {{ caddy_https_port }}/tcp were not opened while Caddy is listening. Run the
+      specsnl.specsops.firewall role first, or set caddy_manage_firewall to false
+      and manage the rules yourself.
+  when:
+    - caddy_firewall_wanted | bool
+    - not caddy_ufw.stat.exists
+
+- name: Allow Caddy ports through firewall
+  community.general.ufw:
+    rule: allow
+    port: "{{ item | string }}"
+    proto: tcp
+  loop:
+    - "{{ caddy_http_port }}"
+    - "{{ caddy_https_port }}"
+  when:
+    - caddy_firewall_wanted | bool
+    - caddy_ufw.stat.exists

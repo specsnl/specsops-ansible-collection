@@ -1,0 +1,24 @@
+---
+argument_specs:
+  main:
+    short_description: Caddy installation from the official apt repository
+    description: Adds the official Caddy apt repository, installs Caddy, enables the service, and optionally opens 80/443 in ufw. Ships no Caddyfile.
+    options:
+      caddy_repo_key_url:
+        type: str
+        description: URL to the Cloudsmith GPG signing key for the Caddy repository.
+      caddy_http_port:
+        type: int
+        default: 80
+        description: HTTP port opened in ufw.
+      caddy_https_port:
+        type: int
+        default: 443
+        description: HTTPS port opened in ufw.
+      caddy_manage_firewall:
+        type: bool
+        default: true
+        description: >-
+          When true, opens caddy_http_port/tcp and caddy_https_port/tcp in ufw.
+          Skipped in containers, and when ufw is not installed — the last case logs
+          a warning instead of failing.
