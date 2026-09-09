@@ -148,4 +148,9 @@ It then builds the tarball and publishes it to Ansible Galaxy.
 | [pr.yml](.github/workflows/pr.yml)     | pull request    | Lint + Molecule, only for the roles the PR touches |
 | [main.yml](.github/workflows/main.yml) | push to `main`  | Lint + Molecule for all roles                      |
 | [md.yml](.github/workflows/md.yml)     | `**.md` changes | markdownlint                                       |
-| [tag.yml](.github/workflows/tag.yml)   | `v*` tag        | Build + publish to Ansible Galaxy                  |
+| [tag.yml](.github/workflows/tag.yml)   | `X.Y.Z` tag     | Build + publish to Ansible Galaxy                  |
+
+[.github/rulesets/](.github/rulesets/) holds snapshots of the repository rulesets. They are
+not applied automatically — import them under Settings → Rules → Rulesets. `Main` requires a
+pull request and the `Check` and `Markdown gate` jobs; the other jobs are conditional and
+would deadlock a PR that does not touch their paths.
