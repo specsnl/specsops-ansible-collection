@@ -13,19 +13,6 @@
 
 Each role's own README documents its variables in full.
 
-## Architecture
-
-These roles are consumed by two repos:
-
-```text
-specsops-golden-images        ─requires→  specsnl.specsops  ←requires─  specsops-ansible
-  Packer build-time                        (this collection)               ansible-pull runtime
-```
-
-The golden-image build installs software via these roles. The ansible-pull runtime
-enforces the same roles on live servers. Because both use the same collection version,
-the system that runs is the system that was tested.
-
 ## Container safety
 
 Roles that touch systemd services, swap or the firewall detect container environments and
