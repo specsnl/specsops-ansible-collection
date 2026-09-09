@@ -3,16 +3,6 @@
 Ansible collection `specsnl.specsops` — reusable roles for provisioning and hardening
 Ubuntu 24.04 (Noble) hosts at Specs.
 
-This collection is the single source of truth consumed by both:
-
-- **[specsops-golden-images](https://github.com/specsnl/specsops-golden-images)** —
-  Packer builds golden images using these roles at build time
-- **[specsops-ansible](https://github.com/specsnl/specsops-ansible)** —
-  `ansible-pull` enforces baseline policy at runtime using the same roles
-
-Same roles, same version — no drift between the image that was built and the system
-that is enforced.
-
 ## Roles
 
 | Role                                   | Description                                                 | Docs                                                             |
