@@ -22,21 +22,22 @@ jobs:
       TAG: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v7
-      - name: Assert tag matches galaxy.yml version
+      - name: Assert preconditions
         run: |
+          FAILED=0
+          if [ -z "$GALAXY_API_KEY" ]; then
+            echo "::error::GALAXY_API_KEY is not set"
+            FAILED=1
+          fi
           GALAXY_VERSION="$(grep '^version:' galaxy.yml | awk '{print $2}')"
           if [ "$GALAXY_VERSION" != "$TAG" ]; then
-            echo "Tag $TAG does not match galaxy.yml version $GALAXY_VERSION"
-            exit 1
+            echo "::error::Tag $TAG does not match galaxy.yml version $GALAXY_VERSION"
+            FAILED=1
           fi
+          exit "$FAILED"
       - name: Build collection
         run: ansible-galaxy collection build --output-path ./dist
       - name: Publish to Ansible Galaxy
-        if: env.GALAXY_API_KEY != ''
         run: |
           ansible-galaxy collection publish "./dist/specsnl-specsops-${TAG}.tar.gz" \
             --api-key "$GALAXY_API_KEY"
-      - name: Skip publish
-        if: env.GALAXY_API_KEY == ''
-        run: |
-          echo "::notice::GALAXY_API_KEY is not set - built the tarball but skipped publishing."

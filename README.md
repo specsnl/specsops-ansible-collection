@@ -137,9 +137,9 @@ Tags carry no `v` prefix — `0.1.0`, not `v0.1.0` — matching the upstream Ans
 collections. The `Tags must not have v-prefix` ruleset under
 [.github/rulesets/](.github/rulesets/) enforces this.
 
-The tag workflow asserts the tag matches `version:` in `galaxy.yml`, then builds and
-publishes to Ansible Galaxy using the `GALAXY_API_KEY` secret. Without that secret the
-job still builds the tarball and passes, skipping only the publish step.
+The tag workflow first asserts that the `GALAXY_API_KEY` secret is set and that the tag
+matches `version:` in `galaxy.yml`, reporting both problems at once if both are wrong.
+It then builds the tarball and publishes it to Ansible Galaxy.
 
 ## CI
 
