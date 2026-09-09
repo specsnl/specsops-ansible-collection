@@ -5,18 +5,18 @@ Ubuntu 24.04 (Noble) hosts at Specs.
 
 ## Roles
 
-| Role                                   | Description                                                 | Docs                                                             |
-|----------------------------------------|-------------------------------------------------------------|------------------------------------------------------------------|
-| `specsnl.specsops.base`                | apt update/upgrade, core packages, locale, timezone, sysctl | [roles/base](roles/base/README.md)                               |
-| `specsnl.specsops.hardening`           | sshd drop-in hardening + fail2ban                           | [roles/hardening](roles/hardening/README.md)                     |
-| `specsnl.specsops.firewall`            | ufw baseline + parameterized extra rules                    | [roles/firewall](roles/firewall/README.md)                       |
-| `specsnl.specsops.unattended_upgrades` | chrony + unattended-upgrades + apt config                   | [roles/unattended_upgrades](roles/unattended_upgrades/README.md) |
-| `specsnl.specsops.postgresql`          | PGDG repo, PostgreSQL install, tuning, `pg_hba`, ufw port   | [roles/postgresql](roles/postgresql/README.md)                   |
-| `specsnl.specsops.swap`                | swap file create/format/persist/activate + sysctl           | [roles/swap](roles/swap/README.md)                               |
-| `specsnl.specsops.logrotate`           | global logrotate maxsize + compression                      | [roles/logrotate](roles/logrotate/README.md)                     |
-| `specsnl.specsops.cleanup`             | apt autoremove/clean, wipe temp dirs (build-time)           | [roles/cleanup](roles/cleanup/README.md)                         |
+| Role                                   | Description                                                 | Docs                                                                                                                              |
+|----------------------------------------|-------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
+| `specsnl.specsops.base`                | apt update/upgrade, core packages, locale, timezone, sysctl | [roles/base](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/base/README.md)                               |
+| `specsnl.specsops.hardening`           | sshd drop-in hardening + fail2ban                           | [roles/hardening](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/hardening/README.md)                     |
+| `specsnl.specsops.firewall`            | ufw baseline + parameterized extra rules                    | [roles/firewall](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/firewall/README.md)                       |
+| `specsnl.specsops.unattended_upgrades` | chrony + unattended-upgrades + apt config                   | [roles/unattended_upgrades](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/unattended_upgrades/README.md) |
+| `specsnl.specsops.postgresql`          | PGDG repo, PostgreSQL install, tuning, `pg_hba`, ufw port   | [roles/postgresql](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/postgresql/README.md)                   |
+| `specsnl.specsops.swap`                | swap file create/format/persist/activate + sysctl           | [roles/swap](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/swap/README.md)                               |
+| `specsnl.specsops.logrotate`           | global logrotate maxsize + compression                      | [roles/logrotate](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/logrotate/README.md)                     |
+| `specsnl.specsops.cleanup`             | apt autoremove/clean, wipe temp dirs (build-time)           | [roles/cleanup](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/cleanup/README.md)                         |
 
-Every role documents its variables in its own README; [docs/README.md](docs/README.md)
+Every role documents its variables in its own README; [docs/README.md](https://github.com/specsnl/specsops-ansible-collection/blob/main/docs/README.md)
 carries the condensed index and the notes on container safety.
 
 All roles detect container environments and skip the steps that cannot work there
@@ -125,7 +125,7 @@ rather than editing `compose.yml`.
 
 Tags carry no `v` prefix — `0.1.0`, not `v0.1.0` — matching the upstream Ansible
 collections. The `Tags must not have v-prefix` ruleset under
-[.github/rulesets/](.github/rulesets/) enforces this.
+[.github/rulesets/](https://github.com/specsnl/specsops-ansible-collection/tree/main/.github/rulesets) enforces this.
 
 The tag workflow first asserts that the `GALAXY_API_KEY` secret is set and that the tag
 matches `version:` in `galaxy.yml`, reporting both problems at once if both are wrong.
@@ -133,14 +133,14 @@ It then builds the tarball and publishes it to Ansible Galaxy.
 
 ## CI
 
-| Workflow                               | Trigger         | Runs                                               |
-|----------------------------------------|-----------------|----------------------------------------------------|
-| [pr.yml](.github/workflows/pr.yml)     | pull request    | Lint + Molecule, only for the roles the PR touches |
-| [main.yml](.github/workflows/main.yml) | push to `main`  | Lint + Molecule for all roles                      |
-| [md.yml](.github/workflows/md.yml)     | `**.md` changes | markdownlint                                       |
-| [tag.yml](.github/workflows/tag.yml)   | `X.Y.Z` tag     | Build + publish to Ansible Galaxy                  |
+| Workflow                                                                                                | Trigger         | Runs                                               |
+|---------------------------------------------------------------------------------------------------------|-----------------|----------------------------------------------------|
+| [pr.yml](https://github.com/specsnl/specsops-ansible-collection/blob/main/.github/workflows/pr.yml)     | pull request    | Lint + Molecule, only for the roles the PR touches |
+| [main.yml](https://github.com/specsnl/specsops-ansible-collection/blob/main/.github/workflows/main.yml) | push to `main`  | Lint + Molecule for all roles                      |
+| [md.yml](https://github.com/specsnl/specsops-ansible-collection/blob/main/.github/workflows/md.yml)     | `**.md` changes | markdownlint                                       |
+| [tag.yml](https://github.com/specsnl/specsops-ansible-collection/blob/main/.github/workflows/tag.yml)   | `X.Y.Z` tag     | Build + publish to Ansible Galaxy                  |
 
-[.github/rulesets/](.github/rulesets/) holds snapshots of the repository rulesets. They are
+[.github/rulesets/](https://github.com/specsnl/specsops-ansible-collection/tree/main/.github/rulesets) holds snapshots of the repository rulesets. They are
 not applied automatically — import them under Settings → Rules → Rulesets. `Main` requires a
 pull request and the `Check` and `Markdown gate` jobs; the other jobs are conditional and
 would deadlock a PR that does not touch their paths.
