@@ -49,6 +49,7 @@ build_ignore:
   - roles/*/molecule
   - changelogs/fragments
   - changelogs/config.yaml
+  - changelogs/.plugin-cache.yaml
   - dist
   - "*.tar.gz"
   - plans

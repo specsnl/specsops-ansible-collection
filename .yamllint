@@ -22,6 +22,5 @@ ignore: |
   compose.yml
   compose.*.yml
   changelogs/changelog.yaml
-  changelogs/.changes.yaml
   changelogs/.plugin-cache.yaml
   collections/
