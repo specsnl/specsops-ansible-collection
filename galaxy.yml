@@ -40,6 +40,7 @@ build_ignore:
   - .editorconfig
   - .yamllint
   - .ansible-lint
+  - .markdownlint-cli2.yaml
   - Taskfile.dist.yml
   - Taskfile.yml
   - requirements.yml
@@ -48,6 +49,7 @@ build_ignore:
   - roles/*/molecule
   - changelogs/fragments
   - changelogs/config.yaml
+  - changelogs/.plugin-cache.yaml
   - dist
   - "*.tar.gz"
   - plans

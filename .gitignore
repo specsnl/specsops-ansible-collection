@@ -11,3 +11,6 @@ dist/
 # Python
 __pycache__/
 *.py[cod]
+
+# antsibull-changelog regenerable cache
+changelogs/.plugin-cache.yaml

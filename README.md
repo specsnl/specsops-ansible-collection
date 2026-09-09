@@ -131,10 +131,15 @@ rather than editing `compose.yml`.
 2. Bump `version:` in `galaxy.yml`
 3. Run `task changelog:release:<version>` — regenerates `CHANGELOG.rst` and consumes
    the fragments
-4. Commit, tag `v<version>`, push
+4. Commit, tag `<version>`, push
 
-The tag workflow asserts the tag matches `version:` in `galaxy.yml`, then builds and
-publishes to Ansible Galaxy using the `GALAXY_API_KEY` secret.
+Tags carry no `v` prefix — `0.1.0`, not `v0.1.0` — matching the upstream Ansible
+collections. The `Tags must not have v-prefix` ruleset under
+[.github/rulesets/](.github/rulesets/) enforces this.
+
+The tag workflow first asserts that the `GALAXY_API_KEY` secret is set and that the tag
+matches `version:` in `galaxy.yml`, reporting both problems at once if both are wrong.
+It then builds the tarball and publishes it to Ansible Galaxy.
 
 ## CI
 
@@ -143,4 +148,9 @@ publishes to Ansible Galaxy using the `GALAXY_API_KEY` secret.
 | [pr.yml](.github/workflows/pr.yml)     | pull request    | Lint + Molecule, only for the roles the PR touches |
 | [main.yml](.github/workflows/main.yml) | push to `main`  | Lint + Molecule for all roles                      |
 | [md.yml](.github/workflows/md.yml)     | `**.md` changes | markdownlint                                       |
-| [tag.yml](.github/workflows/tag.yml)   | `v*` tag        | Build + publish to Ansible Galaxy                  |
+| [tag.yml](.github/workflows/tag.yml)   | `X.Y.Z` tag     | Build + publish to Ansible Galaxy                  |
+
+[.github/rulesets/](.github/rulesets/) holds snapshots of the repository rulesets. They are
+not applied automatically — import them under Settings → Rules → Rulesets. `Main` requires a
+pull request and the `Check` and `Markdown gate` jobs; the other jobs are conditional and
+would deadlock a PR that does not touch their paths.
