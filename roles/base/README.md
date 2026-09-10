@@ -1,6 +1,6 @@
 # specsnl.specsops.base
 
-Base system setup for Ubuntu 24.04: apt update/upgrade, core package install, locale
+Base system setup for Ubuntu 26.04: apt update/upgrade, core package install, locale
 generation, timezone configuration, and sysctl tuning.
 
 ## Unattended-run safety

@@ -1,6 +1,6 @@
 # specsnl.specsops.hardening
 
-OS hardening for Ubuntu 24.04: installs openssh-server, deploys an sshd configuration
+OS hardening for Ubuntu 26.04: installs openssh-server, deploys an sshd configuration
 drop-in that disables root login and password authentication, and installs/enables
 fail2ban.
 

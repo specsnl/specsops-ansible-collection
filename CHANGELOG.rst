@@ -1,8 +1,21 @@
 =======================================================
-specsnl.specsops Collection Changelog 0.1 Release Notes
+specsnl.specsops Collection Changelog 0.2 Release Notes
 =======================================================
 
 .. contents:: Topics
+
+v0.2.0
+======
+
+Release Summary
+---------------
+
+Retargets the collection at Ubuntu 26.04 LTS (Resolute Raccoon). Ubuntu 24.04 (Noble Numbat) is no longer a supported or tested platform. The roles carry no hardcoded codename, so the change is confined to platform metadata, the Molecule test image and the documentation.
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- The collection now targets Ubuntu 26.04 LTS (Resolute Raccoon). Support for Ubuntu 24.04 (Noble Numbat) is dropped — role metadata, Molecule test images and documentation all reference 26.04. The roles themselves derive the release from facts and carry no hardcoded codename.
 
 v0.1.0
 ======

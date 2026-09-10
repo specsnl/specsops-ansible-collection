@@ -9,10 +9,10 @@ galaxy_info:
   platforms:
     - name: Ubuntu
       versions:
-        - noble
+        - resolute
   galaxy_tags:
     - ubuntu
-    - noble
+    - resolute
     - cleanup
     - packer
 dependencies: []

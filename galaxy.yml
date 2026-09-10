@@ -1,12 +1,12 @@
 ---
 namespace: specsnl
 name: specsops
-version: 0.1.0
+version: 0.2.0
 readme: README.md
 authors:
   - Ilyes Ahidar <ilyes@specs.nl>
 description: >-
-  Ansible roles for provisioning and hardening Specs Ubuntu 24.04 hosts:
+  Ansible roles for provisioning and hardening Specs Ubuntu 26.04 hosts:
   base system, hardening, firewall, unattended upgrades, swap, log rotation,
   and PostgreSQL.
 license:
@@ -15,7 +15,7 @@ tags:
   - specsnl
   - specsops
   - ubuntu
-  - noble
+  - resolute
   - hardening
   - postgresql
   - firewall

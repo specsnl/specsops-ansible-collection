@@ -31,3 +31,18 @@ releases:
         and hardens Specs Ubuntu 24.04 (noble) hosts: base system, hardening, firewall,
         unattended upgrades, swap, log rotation, image cleanup and PostgreSQL.'
     release_date: '2026-09-09'
+  0.2.0:
+    changes:
+      breaking_changes:
+      - "The collection now targets Ubuntu 26.04 LTS (Resolute Raccoon). Support for
+        Ubuntu 24.04 (Noble Numbat) is dropped \u2014 role metadata, Molecule test
+        images and documentation all reference 26.04. The roles themselves derive
+        the release from facts and carry no hardcoded codename."
+      release_summary: Retargets the collection at Ubuntu 26.04 LTS (Resolute Raccoon).
+        Ubuntu 24.04 (Noble Numbat) is no longer a supported or tested platform. The
+        roles carry no hardcoded codename, so the change is confined to platform metadata,
+        the Molecule test image and the documentation.
+    fragments:
+    - 0.2.0-release-summary.yml
+    - ubuntu-2604.yml
+    release_date: '2026-09-10'
