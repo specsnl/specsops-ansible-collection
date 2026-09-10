@@ -1,7 +1,7 @@
 # SpecsOps Ansible Collection
 
 Ansible collection `specsnl.specsops` — reusable roles for provisioning and hardening
-Ubuntu 24.04 (Noble) hosts at Specs.
+Ubuntu 26.04 (Resolute) hosts at Specs.
 
 ## Roles
 
@@ -26,7 +26,7 @@ unchanged in a Packer build container, in Molecule, and on a live VM.
 ## Requirements
 
 - Ansible Core >= 2.16
-- Ubuntu 24.04 LTS (Noble Numbat)
+- Ubuntu 26.04 LTS (Resolute Raccoon)
 - Collections: `community.general`, `ansible.posix` (installed automatically via Galaxy)
 
 ## Installation
@@ -97,7 +97,7 @@ task galaxy:install:local
 
 `task --list` shows every task.
 
-Molecule tests run against `geerlingguy/docker-ubuntu2404-ansible`, pinned by digest,
+Molecule tests run against `geerlingguy/docker-ubuntu2604-ansible`, pinned by digest,
 with systemd as PID 1.
 
 ### Local testing with Podman

@@ -1,6 +1,6 @@
 # specsnl.specsops.logrotate
 
-Caps rotated log size and enables compression for Ubuntu 24.04.
+Caps rotated log size and enables compression for Ubuntu 26.04.
 
 ## Why global rather than per-file
 

@@ -1,6 +1,6 @@
 # specsnl.specsops.swap
 
-Swap file provisioning for Ubuntu 24.04: creates a non-sparse swap file, formats it,
+Swap file provisioning for Ubuntu 26.04: creates a non-sparse swap file, formats it,
 activates it, persists it in `/etc/fstab`, and applies the related sysctl tuning.
 
 The `fstab` entry is written last, on purpose: a file that failed to format or

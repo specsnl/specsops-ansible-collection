@@ -1,6 +1,6 @@
 # specsnl.specsops.unattended_upgrades
 
-Automatic security updates for Ubuntu 24.04: installs `unattended-upgrades` and
+Automatic security updates for Ubuntu 26.04: installs `unattended-upgrades` and
 `chrony`, deploys `20auto-upgrades` and `50unattended-upgrades` apt config drop-ins.
 
 ## Variables

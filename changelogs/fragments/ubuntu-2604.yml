@@ -1,0 +1,6 @@
+---
+breaking_changes:
+  - The collection now targets Ubuntu 26.04 LTS (Resolute Raccoon). Support for
+    Ubuntu 24.04 (Noble Numbat) is dropped — role metadata, Molecule test images
+    and documentation all reference 26.04. The roles themselves derive the release
+    from facts and carry no hardcoded codename.

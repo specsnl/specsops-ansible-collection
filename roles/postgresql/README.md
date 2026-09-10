@@ -1,6 +1,6 @@
 # specsnl.specsops.postgresql
 
-PostgreSQL setup for Ubuntu 24.04: adds the official PGDG apt repository, installs
+PostgreSQL setup for Ubuntu 26.04: adds the official PGDG apt repository, installs
 the specified version, deploys a tuning configuration, manages connection access,
 enables the service, and optionally opens the port in ufw.
 
