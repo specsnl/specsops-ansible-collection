@@ -1,7 +1,7 @@
 ---
 namespace: specsnl
 name: specsops
-version: 0.1.0
+version: 0.2.0
 readme: README.md
 authors:
   - Ilyes Ahidar <ilyes@specs.nl>
