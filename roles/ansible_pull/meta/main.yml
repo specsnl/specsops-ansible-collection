@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  role_name: ansible_pull
+  namespace: specsnl
+  author: Ilyes Ahidar
+  description: ansible-pull scaffolding — ansible, an env file and a systemd service/timer pair, shipped disabled
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - resolute
+  galaxy_tags:
+    - ubuntu
+    - resolute
+    - ansible
+    - systemd
+dependencies: []

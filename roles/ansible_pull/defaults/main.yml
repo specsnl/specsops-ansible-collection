@@ -1,0 +1,22 @@
+---
+# Empty means the service is a deliberate no-op: specsnl/specsops-ansible does not
+# exist yet, and a timer pulling from nowhere would only fail every half hour.
+ansible_pull_repo: ""
+ansible_pull_branch: main
+
+# A systemd OnCalendar expression, not a timespan — "*:0/30" is every 30 minutes.
+# Validated with systemd-analyze before the timer is written.
+ansible_pull_interval: "*:0/30"
+
+# Off by default: the units ship installed but disabled, and are enabled once a
+# host has a repository to pull from.
+ansible_pull_enabled: false
+
+ansible_pull_checkout_dir: /var/lib/ansible-pull
+ansible_pull_playbook: local.yml
+
+# The full ansible package rather than ansible-core: pull playbooks want the
+# batteries. git is what ansible-pull clones with.
+ansible_pull_packages:
+  - ansible
+  - git

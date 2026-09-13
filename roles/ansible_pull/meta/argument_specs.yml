@@ -1,0 +1,51 @@
+---
+argument_specs:
+  main:
+    short_description: ansible-pull scaffolding, shipped disabled
+    description: >-
+      Installs the full ansible package and lays down /etc/ansible-pull/env plus an
+      ansible-pull systemd service/timer pair. The service is a no-op while the repo
+      is empty, and the timer is left disabled unless ansible_pull_enabled is set.
+    options:
+      ansible_pull_repo:
+        type: str
+        default: ""
+        description: >-
+          Git repository ansible-pull checks out. Empty — the default — makes the
+          service exit successfully without pulling anything.
+      ansible_pull_branch:
+        type: str
+        default: main
+        description: Branch or tag to check out from ansible_pull_repo.
+      ansible_pull_interval:
+        type: str
+        default: "*:0/30"
+        description: >-
+          Timer OnCalendar expression. This is a calendar event, not a timespan, so
+          "30min" is invalid; the role validates the value with systemd-analyze
+          before writing the timer.
+      ansible_pull_enabled:
+        type: bool
+        default: false
+        description: >-
+          When true, enables and starts ansible-pull.timer. Left false so an image
+          can carry the scaffolding without pulling from a repository that does not
+          exist yet.
+      ansible_pull_checkout_dir:
+        type: str
+        default: /var/lib/ansible-pull
+        description: Directory ansible-pull clones the repository into.
+      ansible_pull_playbook:
+        type: str
+        default: local.yml
+        description: Playbook ansible-pull runs from the checkout.
+      ansible_pull_packages:
+        type: list
+        elements: str
+        default:
+          - ansible
+          - git
+        description: >-
+          Packages to install. The full ansible package rather than ansible-core,
+          since pull playbooks want the batteries; git is what ansible-pull clones
+          with.
