@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  role_name: specsdeployd
+  namespace: specsnl
+  author: Ilyes Ahidar
+  description: specsdeployd scaffolding — system user, sudoers rule, config dir and a systemd unit that stays dormant without the binary
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - resolute
+  galaxy_tags:
+    - ubuntu
+    - resolute
+    - deploy
+    - systemd
+dependencies: []

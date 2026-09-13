@@ -1,0 +1,248 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  vars:
+    specsdeployd_binary: /usr/bin/specsdeployd
+    specsdeployd_installed: "{{ (specsdeployd_version | default('') | length) > 0 }}"
+  tasks:
+    - name: Read the specsdeployd user
+      ansible.builtin.getent:
+        database: passwd
+        key: specsdeployd
+
+    - name: Assert the user has no login shell and no home directory
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.getent_passwd['specsdeployd'][5] == '/usr/sbin/nologin'
+          - ansible_facts.getent_passwd['specsdeployd'][4] == '/nonexistent'
+        fail_msg: "the specsdeployd user is not the shell-less, home-less system user the unit expects"
+
+    - name: Stat the home directory that must not exist
+      ansible.builtin.stat:
+        path: /nonexistent
+      register: specsdeployd_home
+
+    - name: Assert no home directory was created
+      ansible.builtin.assert:
+        that: not specsdeployd_home.stat.exists
+        fail_msg: "/nonexistent was created — the user module made a home directory after all"
+
+    - name: Stat the config directory
+      ansible.builtin.stat:
+        path: /etc/specsdeployd
+      register: specsdeployd_conf
+
+    - name: Assert the config directory is owned by the service user
+      ansible.builtin.assert:
+        that:
+          - specsdeployd_conf.stat.isdir
+          - specsdeployd_conf.stat.mode == '0750'
+          - specsdeployd_conf.stat.pw_name == 'specsdeployd'
+        fail_msg: "/etc/specsdeployd is not a 0750 directory owned by specsdeployd"
+
+    - name: List the config directory
+      ansible.builtin.find:
+        paths: /etc/specsdeployd
+        file_type: any
+        hidden: true
+      register: specsdeployd_conf_files
+
+    # config.json is ansible-pull's to write; a role that baked one would put
+    # per-host configuration into a shared image.
+    - name: Assert the config directory ships empty
+      ansible.builtin.assert:
+        that: specsdeployd_conf_files.files | length == 0
+        fail_msg: "/etc/specsdeployd is not empty — the role baked configuration it does not own"
+
+    - name: Stat the sudoers drop-in
+      ansible.builtin.stat:
+        path: /etc/sudoers.d/specsdeployd
+      register: specsdeployd_sudoers
+
+    - name: Assert the sudoers drop-in is mode 0440 and root-owned
+      ansible.builtin.assert:
+        that:
+          - specsdeployd_sudoers.stat.exists
+          - specsdeployd_sudoers.stat.mode == '0440'
+          - specsdeployd_sudoers.stat.pw_name == 'root'
+        fail_msg: "/etc/sudoers.d/specsdeployd is missing or not 0440 root-owned — sudo ignores it"
+
+    - name: Parse the sudoers drop-in with visudo
+      ansible.builtin.command: /usr/sbin/visudo -cf /etc/sudoers.d/specsdeployd
+      register: specsdeployd_visudo
+      changed_when: false
+      failed_when: false
+
+    - name: Assert visudo parses the drop-in
+      ansible.builtin.assert:
+        that: specsdeployd_visudo.rc == 0
+        fail_msg: "visudo rejects /etc/sudoers.d/specsdeployd: {{ specsdeployd_visudo.stderr }}"
+
+    - name: Read the sudoers drop-in
+      ansible.builtin.slurp:
+        src: /etc/sudoers.d/specsdeployd
+      register: specsdeployd_sudoers_content
+
+    - name: Assert the drop-in grants exactly the two deploy commands
+      ansible.builtin.assert:
+        that:
+          - "'specsdeployd ALL=(root) NOPASSWD: /usr/bin/podman pull *' in specsdeployd_sudoers_lines"
+          - "'specsdeployd ALL=(root) NOPASSWD: /usr/bin/systemctl restart app-*.service' in specsdeployd_sudoers_lines"
+          - specsdeployd_sudoers_lines | reject('match', '^#') | reject('equalto', '') | list | length == 2
+        fail_msg: "the sudoers drop-in does not grant exactly podman pull and systemctl restart app-*"
+      vars:
+        specsdeployd_sudoers_lines: "{{ (specsdeployd_sudoers_content.content | b64decode).splitlines() }}"
+
+    - name: Stat the unit file
+      ansible.builtin.stat:
+        path: /etc/systemd/system/specsdeployd.service
+      register: specsdeployd_unit
+
+    - name: Assert the unit file was installed
+      ansible.builtin.assert:
+        that: specsdeployd_unit.stat.exists
+        fail_msg: "/etc/systemd/system/specsdeployd.service was not installed"
+
+    - name: Check whether the unit is enabled
+      ansible.builtin.command: systemctl is-enabled specsdeployd.service
+      register: specsdeployd_enabled
+      changed_when: false
+      failed_when: false
+
+    - name: Assert the unit is enabled
+      ansible.builtin.assert:
+        that: specsdeployd_enabled.stdout == 'enabled'
+        fail_msg: "specsdeployd.service is '{{ specsdeployd_enabled.stdout }}', expected enabled"
+
+    - name: Read the unit's hardening properties
+      ansible.builtin.command: >-
+        systemctl show specsdeployd.service
+        --property=User --property=ProtectHome --property=PrivateTmp
+        --property=NoNewPrivileges --property=ExecStart
+      register: specsdeployd_props
+      changed_when: false
+
+    - name: Assert the unit runs unprivileged and hardened
+      ansible.builtin.assert:
+        that:
+          - "'User=specsdeployd' in specsdeployd_props.stdout_lines"
+          - "'ProtectHome=yes' in specsdeployd_props.stdout_lines"
+          - "'PrivateTmp=yes' in specsdeployd_props.stdout_lines"
+          # Would block every escalation in the sudoers drop-in.
+          - "'NoNewPrivileges=no' in specsdeployd_props.stdout_lines"
+          - specsdeployd_binary in specsdeployd_props.stdout
+          - "'127.0.0.1:9000' in specsdeployd_props.stdout"
+        fail_msg: "the unit's properties are not what the role templated: {{ specsdeployd_props.stdout_lines }}"
+
+    - name: Read the unit file
+      ansible.builtin.slurp:
+        src: /etc/systemd/system/specsdeployd.service
+      register: specsdeployd_unit_content
+
+    # systemctl show does not report Condition* directives, so this reads the unit
+    # itself; systemd-analyze below then checks what the directive actually decides.
+    - name: Assert the unit carries the start condition
+      ansible.builtin.assert:
+        that: "'ConditionPathExists=' + specsdeployd_binary in (specsdeployd_unit_content.content | b64decode).splitlines()"
+        fail_msg: "the unit has no ConditionPathExists={{ specsdeployd_binary }} — a binary-free host would crash-loop it"
+
+    - name: Stat the binary
+      ansible.builtin.stat:
+        path: "{{ specsdeployd_binary }}"
+      register: specsdeployd_bin
+
+    - name: Evaluate the unit's start condition
+      ansible.builtin.command: systemd-analyze condition "ConditionPathExists={{ specsdeployd_binary }}"
+      register: specsdeployd_condition
+      changed_when: false
+      failed_when: false
+
+    - name: Verify the binary-free default
+      when: not (specsdeployd_installed | bool)
+      block:
+        - name: Assert no binary was installed
+          ansible.builtin.assert:
+            that: not specsdeployd_bin.stat.exists
+            fail_msg: "{{ specsdeployd_binary }} exists — the default install path is not binary-free"
+
+        - name: Assert the start condition is unmet
+          ansible.builtin.assert:
+            that: specsdeployd_condition.rc != 0
+            fail_msg: "systemd considers the start condition met while the binary is missing"
+
+        - name: Start the enabled but binary-free unit
+          ansible.builtin.command: systemctl start specsdeployd.service
+          register: specsdeployd_start
+          changed_when: false
+          failed_when: false
+
+        - name: Read the unit's condition result and state
+          ansible.builtin.command: >-
+            systemctl show specsdeployd.service
+            --property=ConditionResult --property=ActiveState --property=Result
+          register: specsdeployd_state
+          changed_when: false
+
+        # The point of the whole design: enabled at build time, yet a start is a
+        # silent no-op instead of a crash loop or a failed unit.
+        - name: Assert the unit skipped the start on its unmet condition
+          ansible.builtin.assert:
+            that:
+              - specsdeployd_start.rc == 0
+              - "'ConditionResult=no' in specsdeployd_state.stdout_lines"
+              - "'ActiveState=inactive' in specsdeployd_state.stdout_lines"
+              - "'Result=success' in specsdeployd_state.stdout_lines"
+            fail_msg: >-
+              starting the binary-free unit did not no-op
+              (rc={{ specsdeployd_start.rc }}, {{ specsdeployd_state.stdout_lines }})
+
+    - name: Verify the installed release
+      when: specsdeployd_installed | bool
+      block:
+        - name: Assert the binary is where the unit expects it
+          ansible.builtin.assert:
+            that: specsdeployd_bin.stat.exists
+            fail_msg: >-
+              {{ specsdeployd_binary }} is missing — the package and
+              specsdeployd_binary_path have drifted apart, and the unit would stay
+              dormant exactly as if nothing had been installed
+
+        - name: Assert the start condition is now met
+          ansible.builtin.assert:
+            that: specsdeployd_condition.rc == 0
+            fail_msg: "systemd still considers the start condition unmet with the binary installed"
+
+        - name: Ask dpkg who owns the binary
+          ansible.builtin.command: dpkg-query --search {{ specsdeployd_binary }}
+          register: specsdeployd_dpkg
+          changed_when: false
+
+        - name: Assert the package owns the binary
+          ansible.builtin.assert:
+            that: "'specsdeployd:' in specsdeployd_dpkg.stdout"
+            fail_msg: "{{ specsdeployd_binary }} is not owned by the specsdeployd package: {{ specsdeployd_dpkg.stdout }}"
+
+        - name: Run the installed binary
+          ansible.builtin.command: "{{ specsdeployd_binary }} version"
+          register: specsdeployd_run
+          changed_when: false
+
+        - name: Assert it reports the requested version
+          ansible.builtin.assert:
+            that: specsdeployd_version in specsdeployd_run.stdout
+            fail_msg: "the installed binary reports '{{ specsdeployd_run.stdout }}', expected version {{ specsdeployd_version }}"
+
+        # The scaffold release answers "version" and nothing else — there is no
+        # receiver to serve yet — so the unit is left enabled and down rather than
+        # started into a restart loop.
+        - name: Check whether the unit was left alone
+          ansible.builtin.command: systemctl is-active specsdeployd.service
+          register: specsdeployd_installed_active
+          changed_when: false
+          failed_when: false
+
+        - name: Assert the role did not start the service
+          ansible.builtin.assert:
+            that: specsdeployd_installed_active.stdout != 'active'
+            fail_msg: "the role started specsdeployd.service; it only enables it"

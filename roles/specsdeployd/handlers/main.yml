@@ -1,0 +1,11 @@
+---
+# Only for a host that is already serving: restarting an inactive unit would start
+# a receiver the role deliberately left down, and on a binary-free host systemd
+# would simply refuse on the unmet condition.
+- name: Restart specsdeployd
+  ansible.builtin.systemd_service:
+    name: specsdeployd.service
+    daemon_reload: true
+    state: restarted
+  when: >-
+    ansible_facts.services['specsdeployd.service'].state | default('') == 'running'

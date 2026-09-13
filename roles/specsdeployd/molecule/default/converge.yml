@@ -1,0 +1,8 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  tasks:
+    - name: Include specsdeployd role
+      ansible.builtin.include_role:
+        name: specsnl.specsops.specsdeployd
