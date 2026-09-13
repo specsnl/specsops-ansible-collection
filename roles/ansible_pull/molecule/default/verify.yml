@@ -1,0 +1,158 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+        manager: apt
+
+    - name: Assert the full ansible package is installed
+      ansible.builtin.assert:
+        that: "'ansible' in ansible_facts.packages"
+        fail_msg: "ansible is not installed (ansible-core alone is not enough)"
+
+    - name: Stat the ansible-pull binary
+      ansible.builtin.stat:
+        path: /usr/bin/ansible-pull
+      register: ansible_pull_bin
+
+    # The unit hardcodes this path, so a packaging move must fail here.
+    - name: Assert ansible-pull is where the unit expects it
+      ansible.builtin.assert:
+        that: ansible_pull_bin.stat.exists
+        fail_msg: "/usr/bin/ansible-pull is missing — ExecStart points at nothing"
+
+    - name: Stat the env file
+      ansible.builtin.stat:
+        path: /etc/ansible-pull/env
+      register: ansible_pull_env
+
+    - name: Read the env file
+      ansible.builtin.slurp:
+        src: /etc/ansible-pull/env
+      register: ansible_pull_env_content
+
+    - name: Assert the env file ships an empty repo placeholder
+      ansible.builtin.assert:
+        that:
+          - ansible_pull_env.stat.exists
+          - ansible_pull_env.stat.mode == '0600'
+          - "'ANSIBLE_PULL_REPO=' in (ansible_pull_env_content.content | b64decode).splitlines()"
+          - "'ANSIBLE_PULL_BRANCH=main' in (ansible_pull_env_content.content | b64decode).splitlines()"
+        fail_msg: "/etc/ansible-pull/env does not carry the empty-repo placeholders"
+
+    - name: Stat the unit files
+      ansible.builtin.stat:
+        path: "/etc/systemd/system/{{ item }}"
+      register: ansible_pull_units
+      loop:
+        - ansible-pull.service
+        - ansible-pull.timer
+
+    - name: Assert both unit files exist
+      ansible.builtin.assert:
+        that: item.stat.exists
+        fail_msg: "{{ item.item }} was not installed"
+      loop: "{{ ansible_pull_units.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Check whether the timer is enabled
+      ansible.builtin.command: systemctl is-enabled ansible-pull.timer
+      register: ansible_pull_timer_enabled
+      changed_when: false
+      failed_when: false
+
+    - name: Check whether the timer is active
+      ansible.builtin.command: systemctl is-active ansible-pull.timer
+      register: ansible_pull_timer_active
+      changed_when: false
+      failed_when: false
+
+    # The whole point of the role: the scaffolding is present but nothing schedules
+    # a pull from a repository that does not exist yet.
+    - name: Assert the timer ships disabled and stopped
+      ansible.builtin.assert:
+        that:
+          - ansible_pull_timer_enabled.stdout == 'disabled'
+          - ansible_pull_timer_active.stdout != 'active'
+        fail_msg: >-
+          ansible-pull.timer is {{ ansible_pull_timer_enabled.stdout }}/{{ ansible_pull_timer_active.stdout }},
+          expected disabled/inactive
+
+    - name: Check whether the service is enabled
+      ansible.builtin.command: systemctl is-enabled ansible-pull.service
+      register: ansible_pull_service_enabled
+      changed_when: false
+      failed_when: false
+
+    - name: Assert the service is static, so nothing starts it on its own
+      ansible.builtin.assert:
+        that: ansible_pull_service_enabled.stdout == 'static'
+        fail_msg: "ansible-pull.service is '{{ ansible_pull_service_enabled.stdout }}', expected static"
+
+    - name: Read the timer's parsed schedule
+      ansible.builtin.command: systemctl show ansible-pull.timer --property=TimersCalendar --value
+      register: ansible_pull_timer_calendar
+      changed_when: false
+
+    # An OnCalendar systemd cannot parse is dropped with a warning, leaving this
+    # empty and the timer parked forever.
+    - name: Assert systemd parsed the OnCalendar expression
+      ansible.builtin.assert:
+        that: "'OnCalendar=' in ansible_pull_timer_calendar.stdout"
+        fail_msg: "systemd did not accept the OnCalendar expression (TimersCalendar='{{ ansible_pull_timer_calendar.stdout }}')"
+
+    - name: Start the service with an empty repo
+      ansible.builtin.command: systemctl start ansible-pull.service
+      register: ansible_pull_start
+      changed_when: false
+      failed_when: false
+
+    - name: Read the service result
+      ansible.builtin.command: systemctl show ansible-pull.service --property=Result --value
+      register: ansible_pull_result
+      changed_when: false
+
+    - name: Read the service exit status
+      ansible.builtin.command: systemctl show ansible-pull.service --property=ExecMainStatus --value
+      register: ansible_pull_status
+      changed_when: false
+
+    # An unconfigured host must not accumulate failed units: the guard has to exit 0,
+    # which also proves the $$ escaping left the expansion to the shell.
+    - name: Assert the empty-repo run succeeded
+      ansible.builtin.assert:
+        that:
+          - ansible_pull_start.rc == 0
+          - ansible_pull_result.stdout == 'success'
+          - ansible_pull_status.stdout == '0'
+        fail_msg: >-
+          ansible-pull.service failed with an empty repo
+          (rc={{ ansible_pull_start.rc }}, result={{ ansible_pull_result.stdout }},
+          status={{ ansible_pull_status.stdout }})
+
+    - name: Read the service journal
+      ansible.builtin.command: journalctl --unit ansible-pull.service --no-pager
+      register: ansible_pull_journal
+      changed_when: false
+      failed_when: false
+
+    - name: Assert the guard logged why it did nothing
+      ansible.builtin.assert:
+        that: "'nothing to pull' in ansible_pull_journal.stdout"
+        fail_msg: "the empty-repo guard did not log its reason — did ansible-pull actually run?"
+      when: ansible_pull_journal.rc == 0
+
+    - name: List the checkout directory
+      ansible.builtin.find:
+        paths: /var/lib/ansible-pull
+        file_type: any
+        hidden: true
+      register: ansible_pull_checkout
+
+    - name: Assert nothing was cloned
+      ansible.builtin.assert:
+        that: ansible_pull_checkout.files | length == 0
+        fail_msg: "/var/lib/ansible-pull is not empty — the no-op guard let a clone through"

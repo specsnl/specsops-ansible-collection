@@ -1,0 +1,76 @@
+---
+- name: Install ansible and git
+  ansible.builtin.apt:
+    name: "{{ ansible_pull_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure the ansible-pull config directory exists
+  ansible.builtin.file:
+    path: /etc/ansible-pull
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Ensure the ansible-pull checkout directory exists
+  ansible.builtin.file:
+    path: "{{ ansible_pull_checkout_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+# 0600: a repo URL is where a deploy token would end up once a host is configured.
+- name: Install the ansible-pull environment file
+  ansible.builtin.template:
+    src: env.j2
+    dest: /etc/ansible-pull/env
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Check the timer interval against systemd
+  ansible.builtin.command:
+    cmd: systemd-analyze calendar "{{ ansible_pull_interval }}"
+  register: ansible_pull_calendar
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+# Templated straight into OnCalendar, where a bad value yields a timer that simply
+# never fires. Fail here, with the reason, rather than there in silence.
+- name: Assert the timer interval is a calendar expression
+  ansible.builtin.assert:
+    that: ansible_pull_calendar.rc == 0
+    fail_msg: >-
+      ansible_pull_interval ({{ ansible_pull_interval }}) is not a systemd
+      OnCalendar expression. Timespans such as "30min" are not accepted there —
+      every 30 minutes is "*:0/30".
+
+- name: Install the ansible-pull service unit
+  ansible.builtin.template:
+    src: ansible-pull.service.j2
+    dest: /etc/systemd/system/ansible-pull.service
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install the ansible-pull timer unit
+  ansible.builtin.template:
+    src: ansible-pull.timer.j2
+    dest: /etc/systemd/system/ansible-pull.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart ansible-pull timer
+
+# daemon_reload here covers both units: a freshly written unit is invisible to
+# systemctl enable until systemd has re-read it.
+- name: Apply the configured timer state
+  ansible.builtin.systemd_service:
+    name: ansible-pull.timer
+    daemon_reload: true
+    enabled: "{{ ansible_pull_enabled }}"
+    state: "{{ 'started' if ansible_pull_enabled else 'stopped' }}"

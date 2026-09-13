@@ -1,0 +1,13 @@
+# Managed by Ansible — specsnl.specsops.ansible_pull
+[Unit]
+Description=Run ansible-pull on a schedule
+
+[Timer]
+OnCalendar={{ ansible_pull_interval }}
+# Keep a fleet from hitting the git host in lockstep on the half hour.
+RandomizedDelaySec=5min
+# Catch up after downtime instead of waiting for the next slot.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

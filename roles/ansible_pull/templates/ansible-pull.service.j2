@@ -1,0 +1,17 @@
+# Managed by Ansible — specsnl.specsops.ansible_pull
+[Unit]
+Description=Apply the host configuration with ansible-pull
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/ansible-pull/env
+# An ansible run is well past the 90s systemd gives a oneshot by default.
+TimeoutStartSec=30min
+# The $$ are escapes: systemd must leave the expansion to the shell, so that an
+# unconfigured host exits 0 here instead of failing on every timer tick.
+ExecStart=/bin/sh -c 'test -n "$${ANSIBLE_PULL_REPO}" || { echo "ANSIBLE_PULL_REPO is empty in /etc/ansible-pull/env; nothing to pull"; exit 0; }; exec /usr/bin/ansible-pull --url "$${ANSIBLE_PULL_REPO}" --checkout "$${ANSIBLE_PULL_BRANCH:-main}" --directory {{ ansible_pull_checkout_dir }} {{ ansible_pull_playbook }}'
+
+# No [Install] section: the timer schedules this, so the service stays static
+# rather than being something that could be enabled on its own.

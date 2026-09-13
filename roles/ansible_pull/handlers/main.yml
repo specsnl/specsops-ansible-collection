@@ -1,0 +1,9 @@
+---
+# Only meaningful on a host that is already pulling: a running timer keeps its old
+# OnCalendar until it is restarted. A disabled one is re-read when it is enabled.
+- name: Restart ansible-pull timer
+  ansible.builtin.systemd_service:
+    name: ansible-pull.timer
+    daemon_reload: true
+    state: restarted
+  when: ansible_pull_enabled | bool
