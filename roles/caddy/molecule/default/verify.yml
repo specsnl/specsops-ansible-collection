@@ -1,0 +1,83 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+        manager: apt
+
+    - name: Assert caddy is installed
+      ansible.builtin.assert:
+        that: "'caddy' in ansible_facts.packages"
+        fail_msg: "caddy is not installed"
+
+    - name: Check caddy version
+      ansible.builtin.command: caddy version
+      register: caddy_version
+      changed_when: false
+
+    - name: Assert caddy reports v2.x
+      ansible.builtin.assert:
+        that: caddy_version.stdout is search('^v2\\.')
+        fail_msg: "unexpected caddy version: {{ caddy_version.stdout }}"
+
+    - name: Stat Caddy sources list
+      ansible.builtin.stat:
+        path: /etc/apt/sources.list.d/caddy-stable.sources
+      register: caddy_sources
+
+    - name: Assert the Caddy repo is configured
+      ansible.builtin.assert:
+        that: caddy_sources.stat.exists
+        fail_msg: "/etc/apt/sources.list.d/caddy-stable.sources does not exist"
+
+    - name: Check whether caddy.service is enabled
+      ansible.builtin.command: systemctl is-enabled caddy
+      register: caddy_enabled
+      changed_when: false
+      failed_when: false
+
+    - name: Assert caddy.service is enabled
+      ansible.builtin.assert:
+        that: caddy_enabled.stdout == 'enabled'
+        fail_msg: "caddy.service is not enabled (got '{{ caddy_enabled.stdout }}')"
+
+    # The package's default Caddyfile must survive: ansible-pull replaces it at
+    # runtime, and baking one would make the image environment-specific.
+    - name: Stat the packaged Caddyfile
+      ansible.builtin.stat:
+        path: /etc/caddy/Caddyfile
+      register: caddyfile
+
+    - name: Read the packaged Caddyfile
+      ansible.builtin.slurp:
+        src: /etc/caddy/Caddyfile
+      register: caddyfile_content
+      when: caddyfile.stat.exists
+
+    - name: Assert the packaged Caddyfile is untouched
+      ansible.builtin.assert:
+        that:
+          - caddyfile.stat.exists
+          - "'ANSIBLE MANAGED' not in (caddyfile_content.content | b64decode)"
+        fail_msg: "/etc/caddy/Caddyfile is missing or was rewritten by the role"
+
+    # ufw is installed by prepare.yml, so the "is ufw installed" guard passed and
+    # the container guard is the only reason these rules can be absent.
+    - name: Assert ufw is installed
+      ansible.builtin.assert:
+        that: "'ufw' in ansible_facts.packages"
+        fail_msg: "prepare.yml did not install ufw — the container guard is not actually under test"
+
+    - name: Read ufw user rules
+      ansible.builtin.slurp:
+        src: /etc/ufw/user.rules
+      register: ufw_user_rules
+
+    - name: Assert the ufw rules were skipped in a container
+      ansible.builtin.assert:
+        that:
+          - "'80/tcp' not in (ufw_user_rules.content | b64decode)"
+          - "'443/tcp' not in (ufw_user_rules.content | b64decode)"
+        fail_msg: "ufw gained Caddy rules inside a container — the container guard failed"

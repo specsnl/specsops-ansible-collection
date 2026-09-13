@@ -1,0 +1,6 @@
+---
+# Resolute's universe podman is 5.7.x, which already bundles the Quadlet generator,
+# so no extra repository is needed. Add podman-compose or slirp4netns here rather
+# than editing the role.
+podman_packages:
+  - podman

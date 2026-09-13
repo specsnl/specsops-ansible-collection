@@ -1,0 +1,50 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+        manager: apt
+
+    - name: Assert podman is installed
+      ansible.builtin.assert:
+        that: "'podman' in ansible_facts.packages"
+        fail_msg: "podman is not installed"
+
+    - name: Check podman version
+      ansible.builtin.command: podman --version
+      register: podman_version
+      changed_when: false
+
+    - name: Assert podman reports 5.x
+      ansible.builtin.assert:
+        that: podman_version.stdout is search('podman version 5\\.')
+        fail_msg: "unexpected podman version: {{ podman_version.stdout }}"
+
+    - name: Stat the Quadlet generator
+      ansible.builtin.stat:
+        path: /usr/lib/systemd/system-generators/podman-system-generator
+      register: quadlet_generator
+
+    # A version string alone does not prove Quadlet support; the generator does.
+    - name: Assert the Quadlet generator is present
+      ansible.builtin.assert:
+        that: quadlet_generator.stat.exists
+        fail_msg: "podman-system-generator is missing — Quadlet units would never be generated"
+
+    - name: Find Quadlet unit files
+      ansible.builtin.find:
+        paths: /etc/containers/systemd
+        patterns:
+          - "*.container"
+          - "*.volume"
+          - "*.network"
+          - "*.pod"
+      register: quadlet_units
+      failed_when: false
+
+    - name: Assert no Quadlet units were baked in
+      ansible.builtin.assert:
+        that: quadlet_units.files | default([]) | length == 0
+        fail_msg: "the role shipped Quadlet unit files — those belong to ansible-pull"

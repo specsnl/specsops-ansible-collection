@@ -1,0 +1,14 @@
+---
+argument_specs:
+  main:
+    short_description: Podman installation from Resolute universe
+    description: Installs Podman from the distribution repositories. Ships no Quadlet unit files — those are per-environment and belong to ansible-pull.
+    options:
+      podman_packages:
+        type: list
+        elements: str
+        default:
+          - podman
+        description: >-
+          Packages to install. Lets a caller add podman-compose or slirp4netns
+          without editing the role.
