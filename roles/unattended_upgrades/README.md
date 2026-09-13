@@ -5,18 +5,18 @@ Automatic security updates for Ubuntu 26.04: installs `unattended-upgrades` and
 
 ## Variables
 
-| Variable                                  | Default                                        | Description                         |
-|-------------------------------------------|------------------------------------------------|-------------------------------------|
-| `unattended_upgrades_packages`            | `[unattended-upgrades, chrony]`                | Packages to install                 |
-| `unattended_upgrades_periodic_update`     | `"1"`                                          | APT::Periodic::Update-Package-Lists |
-| `unattended_upgrades_periodic_download`   | `"1"`                                          | APT::Periodic::Download-Upgradeable |
-| `unattended_upgrades_periodic_unattended` | `"1"`                                          | APT::Periodic::Unattended-Upgrade   |
-| `unattended_upgrades_autoclean_interval`  | `"7"`                                          | APT::Periodic::AutocleanInterval    |
-| `unattended_upgrades_allowed_origins`     | security + ESM origins (see below)             | Allowed upgrade origins             |
-| `unattended_upgrades_autofix_dpkg`        | `"true"`                                       | AutoFixInterruptedDpkg              |
-| `unattended_upgrades_minimal_steps`       | `"true"`                                       | MinimalSteps                        |
-| `unattended_upgrades_remove_unused`       | `"true"`                                       | Remove-Unused-Dependencies          |
-| `chrony_enabled`                          | `true`                                         | Enable and start chrony             |
+| Variable                                  | Default                            | Description                         |
+|-------------------------------------------|------------------------------------|-------------------------------------|
+| `unattended_upgrades_packages`            | `[unattended-upgrades, chrony]`    | Packages to install                 |
+| `unattended_upgrades_periodic_update`     | `"1"`                              | APT::Periodic::Update-Package-Lists |
+| `unattended_upgrades_periodic_download`   | `"1"`                              | APT::Periodic::Download-Upgradeable |
+| `unattended_upgrades_periodic_unattended` | `"1"`                              | APT::Periodic::Unattended-Upgrade   |
+| `unattended_upgrades_autoclean_interval`  | `"7"`                              | APT::Periodic::AutocleanInterval    |
+| `unattended_upgrades_allowed_origins`     | security + ESM origins (see below) | Allowed upgrade origins             |
+| `unattended_upgrades_autofix_dpkg`        | `"true"`                           | AutoFixInterruptedDpkg              |
+| `unattended_upgrades_minimal_steps`       | `"true"`                           | MinimalSteps                        |
+| `unattended_upgrades_remove_unused`       | `"true"`                           | Remove-Unused-Dependencies          |
+| `chrony_enabled`                          | `true`                             | Enable and start chrony             |
 
 ## Allowed origins
 
