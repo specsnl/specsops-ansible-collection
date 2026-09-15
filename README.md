@@ -15,6 +15,10 @@ Ubuntu 26.04 (Resolute) hosts at Specs.
 | `specsnl.specsops.swap`                | swap file create/format/persist/activate + sysctl           | [roles/swap](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/swap/README.md)                               |
 | `specsnl.specsops.logrotate`           | global logrotate maxsize + compression                      | [roles/logrotate](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/logrotate/README.md)                     |
 | `specsnl.specsops.cleanup`             | apt autoremove/clean, wipe temp dirs (build-time)           | [roles/cleanup](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/cleanup/README.md)                         |
+| `specsnl.specsops.podman`              | Podman from the Ubuntu `universe` repo (Quadlet included)   | [roles/podman](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/podman/README.md)                           |
+| `specsnl.specsops.caddy`               | Cloudsmith apt repo, Caddy install, service, ufw 80/443     | [roles/caddy](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/caddy/README.md)                             |
+| `specsnl.specsops.specsdeployd`        | deploy receiver scaffolding; binary install is opt-in       | [roles/specsdeployd](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/specsdeployd/README.md)               |
+| `specsnl.specsops.ansible_pull`        | ansible-pull service + timer, disabled and inert by default | [roles/ansible_pull](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/ansible_pull/README.md)               |
 
 Every role documents its variables in its own README; [docs/README.md](https://github.com/specsnl/specsops-ansible-collection/blob/main/docs/README.md)
 carries the condensed index and the notes on container safety.
@@ -59,6 +63,26 @@ ansible-galaxy collection install -r requirements.yml
 
 If you use both `base` and `swap`, note that they each manage `vm.swappiness` in their
 own `/etc/sysctl.d/` drop-in. Set it in one of them, not both.
+
+The app-image roles layer on top. Order matters twice: `firewall` before `caddy`, which
+skips its ufw rules with a warning when ufw is absent, and `podman` before
+`specsdeployd`, whose sudoers drop-in escalates to `podman pull`.
+
+```yaml
+- hosts: app
+  become: true
+  roles:
+    - specsnl.specsops.base
+    - specsnl.specsops.firewall
+    - specsnl.specsops.podman
+    - specsnl.specsops.caddy
+    - specsnl.specsops.specsdeployd
+    - specsnl.specsops.ansible_pull
+```
+
+`specsdeployd` and `ansible_pull` ship inert by default — no binary and no repository —
+so the same playbook bakes a golden image and provisions a live host. Set
+`specsdeployd_version` and `ansible_pull_repo` to make either one live.
 
 ## Development
 
@@ -137,7 +161,7 @@ It then builds the tarball and publishes it to Ansible Galaxy.
 |---------------------------------------------------------------------------------------------------------|-----------------|----------------------------------------------------|
 | [pr.yml](https://github.com/specsnl/specsops-ansible-collection/blob/main/.github/workflows/pr.yml)     | pull request    | Lint + Molecule, only for the roles the PR touches |
 | [main.yml](https://github.com/specsnl/specsops-ansible-collection/blob/main/.github/workflows/main.yml) | push to `main`  | Lint + Molecule for all roles                      |
-| [md.yml](https://github.com/specsnl/specsops-ansible-collection/blob/main/.github/workflows/md.yml)     | `**.md` changes | markdownlint                                       |
+| [md.yml](https://github.com/specsnl/specsops-ansible-collection/blob/main/.github/workflows/md.yml)     | `**.md` changes | markdownlint + table formatting                    |
 | [tag.yml](https://github.com/specsnl/specsops-ansible-collection/blob/main/.github/workflows/tag.yml)   | `X.Y.Z` tag     | Build + publish to Ansible Galaxy                  |
 
 [.github/rulesets/](https://github.com/specsnl/specsops-ansible-collection/tree/main/.github/rulesets) holds snapshots of the repository rulesets. They are
