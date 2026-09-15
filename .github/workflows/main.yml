@@ -42,6 +42,10 @@ jobs:
           - swap
           - logrotate
           - cleanup
+          - podman
+          - caddy
+          - specsdeployd
+          - ansible_pull
     steps:
       - uses: actions/checkout@v7
       - name: Install collection deps

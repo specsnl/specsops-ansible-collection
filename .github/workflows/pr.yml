@@ -25,6 +25,10 @@ jobs:
       swap: ${{ steps.filter.outputs.swap }}
       logrotate: ${{ steps.filter.outputs.logrotate }}
       cleanup: ${{ steps.filter.outputs.cleanup }}
+      podman: ${{ steps.filter.outputs.podman }}
+      caddy: ${{ steps.filter.outputs.caddy }}
+      specsdeployd: ${{ steps.filter.outputs.specsdeployd }}
+      ansible_pull: ${{ steps.filter.outputs.ansible_pull }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -54,6 +58,14 @@ jobs:
               - "roles/logrotate/**"
             cleanup:
               - "roles/cleanup/**"
+            podman:
+              - "roles/podman/**"
+            caddy:
+              - "roles/caddy/**"
+            specsdeployd:
+              - "roles/specsdeployd/**"
+            ansible_pull:
+              - "roles/ansible_pull/**"
 
   lint:
     name: Lint
@@ -95,6 +107,14 @@ jobs:
             run: ${{ needs.changes.outputs.logrotate }}
           - role: cleanup
             run: ${{ needs.changes.outputs.cleanup }}
+          - role: podman
+            run: ${{ needs.changes.outputs.podman }}
+          - role: caddy
+            run: ${{ needs.changes.outputs.caddy }}
+          - role: specsdeployd
+            run: ${{ needs.changes.outputs.specsdeployd }}
+          - role: ansible_pull
+            run: ${{ needs.changes.outputs.ansible_pull }}
     steps:
       - uses: actions/checkout@v7
         if: ${{ matrix.run == 'true' }}
