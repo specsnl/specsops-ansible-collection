@@ -15,6 +15,10 @@ vars:
     - swap
     - logrotate
     - cleanup
+    - podman
+    - caddy
+    - specsdeployd
+    - ansible_pull
 
 silent: true
 
