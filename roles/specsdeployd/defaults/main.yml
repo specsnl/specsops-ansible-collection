@@ -1,0 +1,22 @@
+---
+specsdeployd_user: specsdeployd
+
+# Baked into the unit. The receiver is reached through Caddy on loopback, never
+# from the network directly.
+specsdeployd_listen: "127.0.0.1:9000"
+
+# /usr/bin, not /usr/local/bin: this is where the .deb puts the binary (nfpm's
+# default bindir), and /usr/local is reserved for what the package manager does
+# not manage. If this default and the package ever name different paths, the
+# install succeeds while ConditionPathExists never fires — a dormant unit that
+# looks exactly like the intended uninstalled state.
+specsdeployd_binary_path: /usr/bin/specsdeployd
+
+# Created empty: config.json is laid down at runtime by ansible-pull, not baked.
+specsdeployd_config_dir: /etc/specsdeployd
+
+# Empty means do not install — the golden-image default, which bakes the user,
+# the sudoers rule and the unit but leaves the image binary-free.
+specsdeployd_version: ""
+
+specsdeployd_release_base_url: https://github.com/specsnl/specsdeployd/releases/download

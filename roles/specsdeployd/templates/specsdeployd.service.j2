@@ -1,0 +1,27 @@
+# Managed by Ansible — specsnl.specsops.specsdeployd
+[Unit]
+Description=Specs deploy webhook receiver
+Documentation=https://github.com/specsnl/specsdeployd
+Wants=network-online.target
+After=network-online.target
+
+# The golden image bakes this unit but not the binary. The condition is what lets
+# the unit be enabled at build time and still stay dormant — without it, every
+# boot of a binary-free host would leave a failed unit behind.
+ConditionPathExists={{ specsdeployd_binary_path }}
+
+[Service]
+Type=simple
+User={{ specsdeployd_user }}
+Group={{ specsdeployd_user }}
+ExecStart={{ specsdeployd_binary_path }} serve --listen {{ specsdeployd_listen }}
+Restart=on-failure
+RestartSec=5s
+
+# No NoNewPrivileges here: the receiver's whole job runs through the sudoers
+# drop-in, and that setting would block every escalation in it.
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

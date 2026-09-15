@@ -1,0 +1,11 @@
+---
+# nfpm names its packages {{ .PackageName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}.deb,
+# in Go/Debian arch spelling — while Ansible reports the kernel's. Derived rather
+# than exposed: the name has to keep matching the release asset, because get_url
+# matches checksums.txt entries on the downloaded file's basename.
+specsdeployd_arch_map:
+  x86_64: amd64
+  aarch64: arm64
+
+specsdeployd_arch: "{{ specsdeployd_arch_map[ansible_facts['architecture']] | default('') }}"
+specsdeployd_deb: "specsdeployd_{{ specsdeployd_version }}_linux_{{ specsdeployd_arch }}.deb"

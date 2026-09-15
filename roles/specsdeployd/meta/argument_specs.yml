@@ -1,0 +1,47 @@
+---
+argument_specs:
+  main:
+    short_description: specsdeployd scaffolding, with an optional release install
+    description: >-
+      Creates the specsdeployd system user, its empty config directory, the sudoers
+      drop-in that lets it pull images and restart app units, and a systemd unit
+      guarded by ConditionPathExists. The binary itself is installed only when
+      specsdeployd_version is set, so an image can carry the scaffolding without it.
+    options:
+      specsdeployd_user:
+        type: str
+        default: specsdeployd
+        description: >-
+          System user the unit runs as. Created without a login shell and without a
+          home directory, and named in the sudoers drop-in.
+      specsdeployd_listen:
+        type: str
+        default: "127.0.0.1:9000"
+        description: >-
+          Address baked into the unit's ExecStart. Loopback, because the receiver is
+          reached through Caddy rather than from the network.
+      specsdeployd_binary_path:
+        type: str
+        default: /usr/bin/specsdeployd
+        description: >-
+          Path the unit's ConditionPathExists checks and ExecStart runs. /usr/bin is
+          where the .deb puts the binary; changing it without changing the package
+          leaves the unit permanently dormant.
+      specsdeployd_config_dir:
+        type: str
+        default: /etc/specsdeployd
+        description: >-
+          Config directory, created empty and owned by specsdeployd_user. config.json
+          is written at runtime by ansible-pull, not by this role.
+      specsdeployd_version:
+        type: str
+        default: ""
+        description: >-
+          Release to install from GitHub, without the leading v. Empty — the default —
+          installs nothing, which is what keeps a golden image binary-free.
+      specsdeployd_release_base_url:
+        type: str
+        default: https://github.com/specsnl/specsdeployd/releases/download
+        description: >-
+          Base URL the package and checksums.txt are fetched from. Override for a
+          mirror or an air-gapped build.

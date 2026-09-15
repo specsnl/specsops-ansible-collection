@@ -1,0 +1,79 @@
+---
+- name: Create the specsdeployd system user
+  ansible.builtin.user:
+    name: "{{ specsdeployd_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    home: /nonexistent
+    create_home: false
+
+- name: Ensure the specsdeployd config directory exists
+  ansible.builtin.file:
+    path: "{{ specsdeployd_config_dir }}"
+    state: directory
+    owner: "{{ specsdeployd_user }}"
+    group: "{{ specsdeployd_user }}"
+    mode: "0750"
+
+# A sudoers file that does not parse takes sudo down for every user on the host,
+# and this one is templated from a variable. validate writes it through visudo or
+# not at all.
+- name: Install the specsdeployd sudoers drop-in
+  ansible.builtin.template:
+    src: sudoers.j2
+    dest: /etc/sudoers.d/specsdeployd
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+
+- name: Install the specsdeployd release
+  when: specsdeployd_version | length > 0
+  block:
+    - name: Assert the architecture maps to a release artifact
+      ansible.builtin.assert:
+        that: specsdeployd_arch | length > 0
+        fail_msg: >-
+          No specsdeployd package is published for
+          {{ ansible_facts['architecture'] }} — releases carry amd64 and arm64.
+
+    # checksum takes the URL of the release's sha256sum file and matches on the
+    # downloaded file's basename, which is why dest keeps the asset's name. It is
+    # the only supply-chain check here: apt has none for a local .deb.
+    - name: Download the specsdeployd package
+      ansible.builtin.get_url:
+        url: "{{ specsdeployd_release_base_url }}/v{{ specsdeployd_version }}/{{ specsdeployd_deb }}"
+        dest: "/tmp/{{ specsdeployd_deb }}"
+        checksum: "sha256:{{ specsdeployd_release_base_url }}/v{{ specsdeployd_version }}/checksums.txt"
+        owner: root
+        group: root
+        mode: "0644"
+
+    # dpkg owns the binary from here, and apt reports changed only when the
+    # installed version differs — no creates:/command idempotence trap.
+    - name: Install the specsdeployd package
+      ansible.builtin.apt:
+        deb: "/tmp/{{ specsdeployd_deb }}"
+
+# Read before the unit is written: the handler restarts only a receiver that is
+# already running, and a dormant unit must stay dormant.
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+- name: Install the specsdeployd unit
+  ansible.builtin.template:
+    src: specsdeployd.service.j2
+    dest: /etc/systemd/system/specsdeployd.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart specsdeployd
+
+# Enabled, not started: the unit carries ConditionPathExists, so on a host without
+# the binary it is a no-op at boot rather than a crash loop, and on a host that has
+# one the receiver comes up by itself.
+- name: Enable the specsdeployd unit
+  ansible.builtin.systemd_service:
+    name: specsdeployd.service
+    daemon_reload: true
+    enabled: true
