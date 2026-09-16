@@ -1,14 +1,14 @@
 ---
 namespace: specsnl
 name: specsops
-version: 0.2.0
+version: 0.3.0
 readme: README.md
 authors:
   - Ilyes Ahidar <ilyes@specs.nl>
 description: >-
   Ansible roles for provisioning and hardening Specs Ubuntu 26.04 hosts:
   base system, hardening, firewall, unattended upgrades, swap, log rotation,
-  and PostgreSQL.
+  PostgreSQL, Podman, Caddy, the specsdeployd deploy receiver and ansible-pull.
 license:
   - MIT
 tags:
@@ -27,6 +27,11 @@ tags:
   - linux
   - security
   - database
+  - podman
+  - containers
+  - caddy
+  - webserver
+  - deployment
 dependencies:
   community.general: ">=8.0.0,<14.0.0"
   ansible.posix: ">=1.5.0,<3.0.0"

@@ -15,6 +15,10 @@ vars:
     - swap
     - logrotate
     - cleanup
+    - podman
+    - caddy
+    - specsdeployd
+    - ansible_pull
 
 silent: true
 
@@ -118,16 +122,27 @@ tasks:
               molecule {{.CMD}}
 
   md:checkstyle:
-    desc: Check style of Markdown files
+    desc: Check style of Markdown files (tables + markdownlint)
     cmds:
-      - docker compose run --rm --quiet markdown-linter {{.SUB_CMD}} {{.CLI_ARGS}}
+      - task: md:check-tables
+      - task: md:markdownlint
 
   md:fixstyle:
     desc: Fix style of Markdown files (tables + markdownlint --fix)
     cmds:
       - task: md:fix-tables
-      - task: md:checkstyle
+      - task: md:markdownlint
         vars: { SUB_CMD: --fix }
+
+  md:markdownlint:
+    desc: Run markdownlint-cli2
+    cmds:
+      - docker compose run --rm --quiet markdown-linter {{.SUB_CMD}} {{.CLI_ARGS}}
+
+  md:check-tables:
+    desc: Fail on Markdown tables that are not formatted
+    cmds:
+      - docker compose run --rm --quiet markdown-table-formatter --check
 
   md:fix-tables:
     desc: Fix table spacing in Markdown files

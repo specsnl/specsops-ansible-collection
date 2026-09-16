@@ -42,10 +42,21 @@ jobs:
       - name: Lint Markdown files
         uses: DavidAnson/markdownlint-cli2-action@v24
 
+  mdtables:
+    name: Check markdown tables
+    runs-on: ubuntu-24.04
+    needs: changes
+    if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.mdlint == 'true' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+      - name: Check table formatting
+        run: docker compose run --rm markdown-table-formatter --check
+
   gate-mdlint:
     name: Markdown gate
     runs-on: ubuntu-24.04
-    needs: [changes, mdlint]
+    needs: [changes, mdlint, mdtables]
     if: always()
     steps:
       - run: exit 1

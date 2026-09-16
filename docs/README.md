@@ -10,6 +10,10 @@
 | swap                | `specsnl.specsops.swap`                | non-sparse swap file create/format, `/etc/fstab` persist, activate, `vm.swappiness` + `vm.vfs_cache_pressure` drop-in                          |
 | logrotate           | `specsnl.specsops.logrotate`           | global `maxsize` + `compress` in `/etc/logrotate.conf`, plus per-file overrides for jobs that set their own                                    |
 | cleanup             | `specsnl.specsops.cleanup`             | apt autoremove + clean, wipe `/tmp`, `/var/tmp`, `/var/lib/apt/lists` — build-time only                                                        |
+| podman              | `specsnl.specsops.podman`              | Podman from the Ubuntu `universe` repo; Resolute's 5.7.x already bundles Quadlet, so no extra apt repo. Ships no unit files                    |
+| caddy               | `specsnl.specsops.caddy`               | Cloudsmith apt repo + GPG key, Caddy install, service enable, optional ufw 80/443. Keeps the package's default Caddyfile                       |
+| specsdeployd        | `specsnl.specsops.specsdeployd`        | system user, config dir, two-command sudoers drop-in and an enabled-but-dormant unit; `specsdeployd_version` opts into the `.deb`              |
+| ansible_pull        | `specsnl.specsops.ansible_pull`        | `ansible` package, `/etc/ansible-pull/env`, service + timer. Empty repo is a logged no-op; timer stays disabled unless enabled                 |
 
 Each role's own README documents its variables in full.
 
