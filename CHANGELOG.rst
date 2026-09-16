@@ -1,8 +1,24 @@
 =======================================================
-specsnl.specsops Collection Changelog 0.2 Release Notes
+specsnl.specsops Collection Changelog 0.3 Release Notes
 =======================================================
 
 .. contents:: Topics
+
+v0.3.0
+======
+
+Release Summary
+---------------
+
+Adds the four app-image roles that build on the base host roles: ``podman``, ``caddy``, ``specsdeployd`` and ``ansible_pull``. Together they cover a Specs golden image that runs containerised applications behind Caddy, receives deploys over a webhook and reconciles itself with ansible-pull. All four are safe to run at image-build time — ``specsdeployd`` and ``ansible_pull`` ship inert, with no binary and no repository configured, so the same playbook bakes an image and provisions a live host.
+
+Minor Changes
+-------------
+
+- ansible_pull - new role that installs the ``ansible`` package, ``/etc/ansible-pull/env`` and an ``ansible-pull.service`` / ``ansible-pull.timer`` pair. Both ship disabled and inert: an empty ``ANSIBLE_PULL_REPO`` makes the service exit 0 with a log line instead of running ``ansible-pull``, and the timer is only enabled by ``ansible_pull_enabled``. ``ansible_pull_interval`` is validated with ``systemd-analyze calendar``, since ``OnCalendar`` takes a calendar event and would otherwise park the timer forever on a timespan such as ``30min``.
+- caddy - new role that adds the official Cloudsmith apt repository, installs Caddy, enables the service and optionally opens 80/443 in ufw. It does not depend on the ``firewall`` role, so the rules are skipped with a warning when ufw is missing rather than aborting the play with Caddy already listening. The package's default Caddyfile is left in place.
+- podman - new role that installs Podman from the Ubuntu ``universe`` repository. Resolute ships 5.7.x, which already bundles the Quadlet generator, so no extra apt repository is needed. The role ships no unit files and enables neither ``podman.socket`` nor ``podman-auto-update.timer`` — Quadlet-managed containers are plain systemd units and need neither.
+- specsdeployd - new role that lays down the scaffolding for the ``specsdeployd`` deploy webhook receiver: a system user, an empty config directory, a two-command sudoers drop-in written through ``visudo -cf``, and a systemd unit. The unit ships enabled but dormant behind ``ConditionPathExists``, so a golden image can carry it without collecting a failed unit on every boot. Installing the binary is opt-in via ``specsdeployd_version``, which fetches that release's ``.deb`` and verifies it against the release ``checksums.txt``.
 
 v0.2.0
 ======
