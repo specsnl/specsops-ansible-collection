@@ -16,6 +16,8 @@ platforms:
     cgroupns_mode: host
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      # Stands in for the build image's /tmp, which is a volume rather than a tmpfs.
+      - /srv/cleanup-volume
     tmpfs:
       - /run
       - /tmp

@@ -6,3 +6,9 @@
     - name: Include cleanup role
       ansible.builtin.include_role:
         name: specsnl.specsops.cleanup
+      vars:
+        cleanup_paths:
+          - /tmp
+          - /var/tmp
+          - /var/lib/apt/lists
+          - /srv/cleanup-volume

@@ -3,15 +3,46 @@
   hosts: all
   become: true
   tasks:
-    - name: Check cleanup test file is absent from /tmp
-      ansible.builtin.stat:
-        path: /tmp/cleanup-test-file
-      register: cleanup_test_file_stat
+    # A missing mount would otherwise make the "left alone" assertions pass vacuously.
+    - name: Check the mount types the scenario relies on
+      ansible.builtin.command:
+        cmd: findmnt --noheadings --output FSTYPE --mountpoint {{ item }}
+      register: cleanup_fstypes
+      changed_when: false
+      failed_when: false
+      loop:
+        - /tmp
+        - /srv/cleanup-volume
+        - /var/tmp
 
-    - name: Assert cleanup test file was removed from /tmp
+    - name: Assert /tmp is a tmpfs, the volume a non-tmpfs mount, /var/tmp no mount
       ansible.builtin.assert:
-        that: not cleanup_test_file_stat.stat.exists
-        fail_msg: "/tmp/cleanup-test-file still exists after cleanup"
+        that:
+          - cleanup_fstypes.results[0].stdout == 'tmpfs'
+          - cleanup_fstypes.results[1].rc == 0
+          - cleanup_fstypes.results[1].stdout != 'tmpfs'
+          - cleanup_fstypes.results[2].rc == 1
+        fail_msg: "The scenario's mounts are not what the assertions below assume"
+
+    - name: Check the cleanup test files
+      ansible.builtin.stat:
+        path: "{{ item }}/cleanup-test-file"
+      register: cleanup_test_file_stat
+      loop:
+        - /tmp
+        - /srv/cleanup-volume
+        - /var/tmp
+
+    - name: Assert mounts were left alone and plain disk was wiped
+      ansible.builtin.assert:
+        that:
+          - cleanup_test_file_stat.results[0].stat.exists
+          - cleanup_test_file_stat.results[1].stat.exists
+          - not cleanup_test_file_stat.results[2].stat.exists
+        fail_msg: >-
+          Expected the tmpfs /tmp and the volume to keep their test file and /var/tmp
+          to lose it; got {{ cleanup_test_file_stat.results
+          | map(attribute='stat.exists') | list }}
 
     - name: Check /var/lib/apt/lists has no package index files
       ansible.builtin.find:
@@ -28,3 +59,29 @@
       ansible.builtin.assert:
         that: apt_lists_contents.files | length == 0
         fail_msg: "/var/lib/apt/lists still contains package index files after cleanup"
+
+    - name: Run the role again as if on a VM
+      ansible.builtin.include_role:
+        name: specsnl.specsops.cleanup
+      vars:
+        cleanup_in_container: false
+        cleanup_paths:
+          - /tmp
+          - /srv/cleanup-volume
+
+    - name: Check the cleanup test files after the VM run
+      ansible.builtin.stat:
+        path: "{{ item }}/cleanup-test-file"
+      register: cleanup_vm_stat
+      loop:
+        - /tmp
+        - /srv/cleanup-volume
+
+    - name: Assert only the tmpfs was left alone on a VM
+      ansible.builtin.assert:
+        that:
+          - cleanup_vm_stat.results[0].stat.exists
+          - not cleanup_vm_stat.results[1].stat.exists
+        fail_msg: >-
+          Expected the tmpfs /tmp to keep its test file and the non-tmpfs mount to lose
+          it; got {{ cleanup_vm_stat.results | map(attribute='stat.exists') | list }}
