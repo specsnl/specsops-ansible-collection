@@ -9,6 +9,51 @@
     clean: true
   changed_when: false
 
+# stat, not a fileglob lookup: lookups run on the controller, not the target.
+- name: Stat container marker files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: cleanup_container_markers
+  loop:
+    - /.dockerenv
+    - /run/.containerenv
+  when:
+    - cleanup_skip_ephemeral
+    - cleanup_in_container is not defined
+
+- name: Detect container environment
+  ansible.builtin.set_fact:
+    cleanup_in_container: >-
+      {{ (ansible_facts['virtualization_type'] | default('') in
+          ['docker', 'container', 'containerd', 'podman', 'lxc'])
+         or (cleanup_container_markers.results
+             | selectattr('stat.exists') | list | length > 0) }}
+  when:
+    - cleanup_skip_ephemeral
+    - cleanup_in_container is not defined
+
+# findmnt, not the mounts fact, so hardware facts are not required. rc 1: not a mountpoint.
+- name: Probe cleanup paths for mounts
+  ansible.builtin.command:
+    cmd: findmnt --noheadings --output FSTYPE --mountpoint {{ item }}
+  register: cleanup_path_mounts
+  loop: "{{ cleanup_paths }}"
+  changed_when: false
+  check_mode: false
+  failed_when: cleanup_path_mounts.rc not in [0, 1]
+  when: cleanup_skip_ephemeral
+
+# docker commit captures no mount, but a VM's disk partitions do reach the template.
+- name: Select the mounts whose contents never reach the image
+  vars:
+    cleanup_mounted: "{{ cleanup_path_mounts.results | selectattr('rc', 'equalto', 0) | list }}"
+  ansible.builtin.set_fact:
+    cleanup_ephemeral_paths: >-
+      {{ (cleanup_mounted if cleanup_in_container | bool
+          else cleanup_mounted | selectattr('stdout', 'equalto', 'tmpfs'))
+         | map(attribute='item') | list }}
+  when: cleanup_skip_ephemeral
+
 - name: Wipe temp directory contents
   ansible.builtin.find:
     paths: "{{ item }}"
@@ -20,7 +65,7 @@
       {{ ['lock', 'partial', 'auxfiles']
          if (item | regex_replace('/+$', '')) == '/var/lib/apt/lists' else [] }}
   register: cleanup_tmp_contents
-  loop: "{{ cleanup_paths }}"
+  loop: "{{ cleanup_paths | reject('in', cleanup_ephemeral_paths | default([])) | list }}"
 
 - name: Delete found temp files and directories
   ansible.builtin.file:

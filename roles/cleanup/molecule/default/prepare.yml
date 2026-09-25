@@ -3,8 +3,12 @@
   hosts: all
   become: true
   tasks:
-    - name: Create test file in /tmp to confirm cleanup runs
+    - name: Create test files
       ansible.builtin.file:
-        path: /tmp/cleanup-test-file
+        path: "{{ item }}/cleanup-test-file"
         state: touch
         mode: "0644"
+      loop:
+        - /tmp
+        - /srv/cleanup-volume
+        - /var/tmp

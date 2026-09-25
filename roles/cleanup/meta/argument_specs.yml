@@ -8,3 +8,11 @@ argument_specs:
         type: list
         elements: str
         description: List of directories whose contents will be deleted.
+      cleanup_skip_ephemeral:
+        type: bool
+        default: true
+        description: >-
+          Leave entries of cleanup_paths untouched when they are mounts whose contents
+          never reach the image: a tmpfs anywhere, or any mount when running in a
+          container. Wiping those saves nothing, and deletes the running interpreter's
+          scratch files when Ansible runs on the target itself.

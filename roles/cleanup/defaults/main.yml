@@ -3,3 +3,6 @@ cleanup_paths:
   - /tmp
   - /var/tmp
   - /var/lib/apt/lists
+
+# Skips tmpfs mounts, and any mount in a container: their contents never reach the image.
+cleanup_skip_ephemeral: true
