@@ -4,6 +4,19 @@ specsnl.specsops Collection Changelog 0.3 Release Notes
 
 .. contents:: Topics
 
+v0.3.1
+======
+
+Release Summary
+---------------
+
+Bugfix release. The ``cleanup`` role no longer wipes ``cleanup_paths`` entries whose contents never reach the image, which broke Packer ``ansible-local`` builds by deleting Python's multiprocessing scratch directory from ``/tmp`` mid-run.
+
+Bugfixes
+--------
+
+- cleanup - entries of ``cleanup_paths`` are now left alone when they are mounts whose contents never reach the image: a tmpfs anywhere, or any mount when running in a container, since ``docker commit`` captures neither tmpfs nor volumes. Wiping those saved nothing, and when Ansible runs on the target itself (Packer's ``ansible-local``) it deleted Python's multiprocessing scratch directory from ``/tmp`` mid-run, so the build ended in a ``FileNotFoundError`` traceback. A path on its own disk partition on a VM is still wiped. ``cleanup_skip_ephemeral: false`` restores the old behaviour.
+
 v0.3.0
 ======
 
