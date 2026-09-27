@@ -19,6 +19,7 @@ vars:
     - caddy
     - specsdeployd
     - ansible_pull
+    - cloud_init_user
 
 silent: true
 
