@@ -46,6 +46,7 @@ jobs:
           - caddy
           - specsdeployd
           - ansible_pull
+          - cloud_init_user
     steps:
       - uses: actions/checkout@v7
       - name: Install collection deps
