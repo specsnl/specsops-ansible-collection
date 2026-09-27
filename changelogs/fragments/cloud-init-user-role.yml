@@ -1,0 +1,20 @@
+---
+minor_changes:
+  - >-
+    cloud_init_user - new role that bakes a cloud-init ``system_info.default_user``
+    drop-in into an image, so first boot creates a non-root sudo user (``specsops`` by
+    default) and installs the metadata SSH keys on it rather than on ``root``, which
+    ``hardening`` locks out with ``PermitRootLogin no``. Optional
+    ``cloud_init_user_ssh_import_ids`` installs ``ssh-import-id`` and imports keys such
+    as ``gh:<user>`` once per instance; they are written as a top-level
+    ``ssh_import_id``, because ``cc_ssh_import_id`` ignores the key under
+    ``default_user``. The drop-in is validated with ``cloud-init schema`` when
+    cloud-init is installed.
+
+trivial:
+  - >-
+    CI - ``cloud_init_user`` is wired into the Molecule matrices of ``pr.yml`` and
+    ``main.yml`` and into the Taskfile ``ROLES`` fan-out.
+  - >-
+    galaxy.yml - the ``system`` tag makes room for ``cloudinit``; Galaxy rejects more
+    than 20 tags.
