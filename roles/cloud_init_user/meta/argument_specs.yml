@@ -1,0 +1,49 @@
+---
+argument_specs:
+  main:
+    short_description: cloud-init default login user
+    description: >-
+      Deploys a cloud-init drop-in that sets system_info.default_user, so an image's
+      first boot creates a non-root sudo user and installs the metadata SSH keys on it
+      instead of on root.
+    options:
+      cloud_init_user_name:
+        type: str
+        default: specsops
+        description: Name of the default user cloud-init creates at first boot.
+      cloud_init_user_gecos:
+        type: str
+        default: SpecsOps admin
+        description: >-
+          Full-name (GECOS) field of the default user. Set explicitly, otherwise the
+          user inherits the stock cloud.cfg value "Ubuntu".
+      cloud_init_user_groups:
+        type: list
+        elements: str
+        default: [adm, sudo]
+        description: Supplementary groups of the default user. They must already exist.
+      cloud_init_user_sudo:
+        type: str
+        default: "ALL=(ALL) NOPASSWD:ALL"
+        description: >-
+          Sudoers rule for the default user. The password is locked, so a rule that
+          asks for one leaves the user without root.
+      cloud_init_user_shell:
+        type: str
+        default: /bin/bash
+        description: Login shell of the default user.
+      cloud_init_user_ssh_import_ids:
+        type: list
+        elements: str
+        default: []
+        description: >-
+          ssh-import-id sources such as gh:<user>, imported for the default user once
+          per instance. Installs ssh-import-id when non-empty. First boot then needs
+          HTTPS access to the key server.
+      cloud_init_user_dropin_path:
+        type: str
+        default: /etc/cloud/cloud.cfg.d/99-zz-specsops-default-user.cfg
+        description: >-
+          Path to the cloud-init drop-in. cloud-init merges cloud.cfg.d in byte order
+          and the last file wins, so it must sort after every drop-in that sets
+          system_info, such as UpCloud's 92-upcloud.cfg.

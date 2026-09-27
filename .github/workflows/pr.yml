@@ -29,6 +29,7 @@ jobs:
       caddy: ${{ steps.filter.outputs.caddy }}
       specsdeployd: ${{ steps.filter.outputs.specsdeployd }}
       ansible_pull: ${{ steps.filter.outputs.ansible_pull }}
+      cloud_init_user: ${{ steps.filter.outputs.cloud_init_user }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -66,6 +67,8 @@ jobs:
               - "roles/specsdeployd/**"
             ansible_pull:
               - "roles/ansible_pull/**"
+            cloud_init_user:
+              - "roles/cloud_init_user/**"
 
   lint:
     name: Lint
@@ -115,6 +118,8 @@ jobs:
             run: ${{ needs.changes.outputs.specsdeployd }}
           - role: ansible_pull
             run: ${{ needs.changes.outputs.ansible_pull }}
+          - role: cloud_init_user
+            run: ${{ needs.changes.outputs.cloud_init_user }}
     steps:
       - uses: actions/checkout@v7
         if: ${{ matrix.run == 'true' }}

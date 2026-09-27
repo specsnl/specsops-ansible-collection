@@ -14,6 +14,7 @@
 | caddy               | `specsnl.specsops.caddy`               | Cloudsmith apt repo + GPG key, Caddy install, service enable, optional ufw 80/443. Keeps the package's default Caddyfile                       |
 | specsdeployd        | `specsnl.specsops.specsdeployd`        | system user, config dir, two-command sudoers drop-in and an enabled-but-dormant unit; `specsdeployd_version` opts into the `.deb`              |
 | ansible_pull        | `specsnl.specsops.ansible_pull`        | `ansible` package, `/etc/ansible-pull/env`, service + timer. Empty repo is a logged no-op; timer stays disabled unless enabled                 |
+| cloud_init_user     | `specsnl.specsops.cloud_init_user`     | `99-zz-` cloud.cfg.d drop-in: `system_info.default_user` `specsops` with sudo and a locked password, `disable_root`, optional `ssh_import_id`  |
 
 Each role's own README documents its variables in full.
 

@@ -1,0 +1,11 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  tasks:
+    - name: Include cloud_init_user role
+      ansible.builtin.include_role:
+        name: specsnl.specsops.cloud_init_user
+      vars:
+        cloud_init_user_ssh_import_ids:
+          - gh:octocat

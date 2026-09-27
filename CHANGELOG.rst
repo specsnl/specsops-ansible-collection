@@ -4,6 +4,19 @@ specsnl.specsops Collection Changelog 0.3 Release Notes
 
 .. contents:: Topics
 
+v0.3.2
+======
+
+Release Summary
+---------------
+
+Feature release. The new ``cloud_init_user`` role gives images a non-root cloud-init default login user, so VMs cloned from a template that ``hardening`` locks root out of can be logged into with the keys given at creation.
+
+Minor Changes
+-------------
+
+- cloud_init_user - new role that bakes a cloud-init ``system_info.default_user`` drop-in into an image, so first boot creates a non-root sudo user (``specsops`` by default) and installs the metadata SSH keys on it rather than on ``root``, which ``hardening`` locks out with ``PermitRootLogin no``. Optional ``cloud_init_user_ssh_import_ids`` installs ``ssh-import-id`` and imports keys such as ``gh:<user>`` once per instance; they are written as a top-level ``ssh_import_id``, because ``cc_ssh_import_id`` ignores the key under ``default_user``. The drop-in is validated with ``cloud-init schema`` when cloud-init is installed.
+
 v0.3.1
 ======
 

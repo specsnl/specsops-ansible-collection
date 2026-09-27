@@ -1,0 +1,31 @@
+---
+- name: Ensure cloud.cfg.d directory exists
+  ansible.builtin.file:
+    path: /etc/cloud/cloud.cfg.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install ssh-import-id
+  ansible.builtin.apt:
+    name: ssh-import-id
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: cloud_init_user_ssh_import_ids | length > 0
+
+# Docker build images may ship without cloud-init, and there is nothing to validate with.
+- name: Stat the cloud-init binary
+  ansible.builtin.stat:
+    path: /usr/bin/cloud-init
+  register: cloud_init_user_binary
+
+- name: Deploy cloud-init default user drop-in
+  ansible.builtin.template:
+    src: default-user.cfg.j2
+    dest: "{{ cloud_init_user_dropin_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+    validate: "{{ 'cloud-init schema -c %s' if cloud_init_user_binary.stat.exists else omit }}"

@@ -1,0 +1,32 @@
+---
+# Build containers may lack cloud-init, but a VM image always has it, and without
+# it the drop-in is never schema-validated nor merged the way first boot merges it.
+- name: Prepare
+  hosts: all
+  become: true
+  tasks:
+    - name: Install cloud-init
+      ansible.builtin.apt:
+        name: cloud-init
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    # UpCloud's Ubuntu template ships this file. It is what a too-low-numbered
+    # drop-in silently loses to, leaving root as the only login user.
+    - name: Reproduce the UpCloud cloud-init drop-in
+      ansible.builtin.copy:
+        content: |
+          users:
+             - default
+          disable_root: false
+          system_info:
+             distro: ubuntu
+             default_user:
+               name: root
+               lock_passwd: True
+               shell: /bin/bash
+        dest: /etc/cloud/cloud.cfg.d/92-upcloud.cfg
+        owner: root
+        group: root
+        mode: "0644"
