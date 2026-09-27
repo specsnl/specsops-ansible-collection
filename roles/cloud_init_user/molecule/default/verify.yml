@@ -1,0 +1,92 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  vars:
+    cloud_init_user_dropin: /etc/cloud/cloud.cfg.d/99-zz-specsops-default-user.cfg
+    # Resolves the default user the way cc_ssh and cc_ssh_import_id do at first boot.
+    cloud_init_user_effective_cmd: |-
+      python3 -c '
+      import json
+      from cloudinit import stages
+      from cloudinit.distros import ug_util
+      init = stages.Init(ds_deps=[])
+      users, _ = ug_util.normalize_users_groups(init.cfg, init.distro)
+      name, config = ug_util.extract_default(users)
+      print(json.dumps({
+          "name": name,
+          "config": config,
+          "disable_root": init.cfg.get("disable_root"),
+          "ssh_import_id": init.cfg.get("ssh_import_id", []),
+      }))
+      '
+  tasks:
+    - name: Stat the drop-in
+      ansible.builtin.stat:
+        path: "{{ cloud_init_user_dropin }}"
+      register: cloud_init_user_dropin_stat
+
+    - name: Assert the drop-in exists and is world-readable
+      ansible.builtin.assert:
+        that:
+          - cloud_init_user_dropin_stat.stat.exists
+          - cloud_init_user_dropin_stat.stat.mode == '0644'
+        fail_msg: "{{ cloud_init_user_dropin }} is missing or not mode 0644"
+
+    - name: Validate the drop-in schema
+      ansible.builtin.command: cloud-init schema -c {{ cloud_init_user_dropin }}
+      changed_when: false
+
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+        manager: apt
+
+    - name: Assert ssh-import-id is installed
+      ansible.builtin.assert:
+        that: "'ssh-import-id' in ansible_facts.packages"
+        fail_msg: "ssh-import-id is not installed although cloud_init_user_ssh_import_ids is set"
+
+    # The file contents are not what matters: cloud-init merges it with cloud.cfg and
+    # every other drop-in, and ignores ssh_import_id under default_user.
+    - name: Resolve the effective default user
+      ansible.builtin.command: "{{ cloud_init_user_effective_cmd }}"
+      register: cloud_init_user_effective
+      changed_when: false
+
+    # normalize_users_groups hands groups on as a comma-joined string.
+    - name: Assert the default user and its key import are in effect
+      vars:
+        effective: "{{ cloud_init_user_effective.stdout | from_json }}"
+      ansible.builtin.assert:
+        that:
+          - effective.name == 'specsops'
+          - effective.config.lock_passwd
+          - effective.config.gecos == 'SpecsOps admin'
+          - effective.config.groups == 'adm,sudo'
+          - effective.config.sudo == ['ALL=(ALL) NOPASSWD:ALL']
+          - effective.config.shell == '/bin/bash'
+          - effective.disable_root
+          - effective.ssh_import_id == ['gh:octocat']
+        fail_msg: >-
+          cloud-init resolves a different default user: {{ effective }}. The drop-in
+          is most likely losing to /etc/cloud/cloud.cfg.d/92-upcloud.cfg.
+
+    - name: Run the role again without key imports
+      ansible.builtin.include_role:
+        name: specsnl.specsops.cloud_init_user
+      vars:
+        cloud_init_user_ssh_import_ids: []
+
+    - name: Resolve the effective default user without key imports
+      ansible.builtin.command: "{{ cloud_init_user_effective_cmd }}"
+      register: cloud_init_user_effective_plain
+      changed_when: false
+
+    - name: Assert no key import is left behind
+      vars:
+        effective: "{{ cloud_init_user_effective_plain.stdout | from_json }}"
+      ansible.builtin.assert:
+        that:
+          - effective.name == 'specsops'
+          - effective.ssh_import_id == []
+        fail_msg: "Expected specsops without ssh_import_id, got {{ effective }}"

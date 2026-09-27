@@ -1,0 +1,19 @@
+---
+galaxy_info:
+  role_name: cloud_init_user
+  namespace: specsnl
+  author: Ilyes Ahidar
+  description: cloud-init default user — a non-root sudo login user created at first boot
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - resolute
+  galaxy_tags:
+    - ubuntu
+    - resolute
+    - cloudinit
+    - ssh
+    - packer
+dependencies: []

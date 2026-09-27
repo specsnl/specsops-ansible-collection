@@ -1,0 +1,15 @@
+---
+cloud_init_user_name: specsops
+cloud_init_user_gecos: SpecsOps admin
+cloud_init_user_groups:
+  - adm
+  - sudo
+cloud_init_user_sudo: "ALL=(ALL) NOPASSWD:ALL"
+cloud_init_user_shell: /bin/bash
+cloud_init_user_ssh_import_ids: []
+
+# cloud-init merges cloud.cfg.d in byte order and the last file wins. UpCloud's
+# Ubuntu template ships 92-upcloud.cfg, which sets default_user root and
+# disable_root false; 99-zz- sorts after it and after subiquity's 99-installer.cfg.
+# "-" sorts before "_" and letters, so a 99_*.cfg or a letter-named drop-in would still win.
+cloud_init_user_dropin_path: /etc/cloud/cloud.cfg.d/99-zz-specsops-default-user.cfg

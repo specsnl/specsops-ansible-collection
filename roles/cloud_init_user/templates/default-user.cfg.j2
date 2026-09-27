@@ -1,0 +1,15 @@
+#cloud-config
+# Managed by Ansible — specsnl.specsops.cloud_init_user
+disable_root: true
+system_info:
+  default_user:
+    name: {{ cloud_init_user_name }}
+    lock_passwd: true
+    gecos: {{ cloud_init_user_gecos | to_json }}
+    groups: {{ cloud_init_user_groups | to_json }}
+    sudo: {{ [cloud_init_user_sudo] | to_json }}
+    shell: {{ cloud_init_user_shell }}
+{% if cloud_init_user_ssh_import_ids %}
+# Top-level: cc_ssh_import_id ignores ssh_import_id under default_user.
+ssh_import_id: {{ cloud_init_user_ssh_import_ids | to_json }}
+{% endif %}
