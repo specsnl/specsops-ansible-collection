@@ -15,8 +15,65 @@ argument_specs:
       firewall_rules:
         type: list
         elements: dict
-        description: Base firewall rules applied before extra_rules. Each dict has rule, port, proto.
+        description: >-
+          Base firewall rules applied before extra_rules. Each dict is passed to
+          community.general.ufw. Removing an entry does not remove its rule from ufw;
+          keep it with delete true instead.
+        options: &firewall_rule_options
+          rule:
+            type: str
+            required: true
+            choices: [allow, deny, limit, reject]
+            description: Action to take on matching traffic.
+          direction:
+            type: str
+            choices: [in, out]
+            description: >-
+              Traffic direction. Required with interface; mutually exclusive with
+              interface_in and interface_out.
+          interface:
+            type: str
+            description: Interface the rule applies to, in the given direction.
+          interface_in:
+            type: str
+            description: Input interface. Combine with interface_out for route rules.
+          interface_out:
+            type: str
+            description: Output interface. Combine with interface_in for route rules.
+          from_ip:
+            type: str
+            description: Source address or network. ufw defaults to any.
+          from_port:
+            type: str
+            description: Source port or port range.
+          to_ip:
+            type: str
+            description: Destination address or network. ufw defaults to any.
+          to_port:
+            type: str
+            description: Destination port or port range.
+          port:
+            type: str
+            description: Alias of to_port, kept for existing rules. to_port wins when both are set.
+          proto:
+            type: str
+            description: Protocol to match.
+          route:
+            type: bool
+            default: false
+            description: Apply the rule to routed/forwarded traffic instead of traffic to the host.
+          comment:
+            type: str
+            description: Comment stored with the rule.
+          delete:
+            type: bool
+            default: false
+            description: >-
+              Remove a previously applied rule matching the other keys, instead of adding it.
       firewall_extra_rules:
         type: list
         elements: dict
-        description: Additional rules appended after firewall_rules. Composition seam for other roles/playbooks.
+        description: >-
+          Additional rules appended after firewall_rules. Composition seam for other
+          roles/playbooks. Same keys as firewall_rules.
+        options: *firewall_rule_options

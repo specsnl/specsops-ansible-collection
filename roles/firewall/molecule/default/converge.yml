@@ -2,6 +2,27 @@
 - name: Converge
   hosts: all
   become: true
+  vars:
+    firewall_extra_rules:
+      - rule: allow
+        from_ip: 10.20.0.16/28
+        to_port: "5432"
+        proto: tcp
+        comment: app range
+      - rule: allow
+        direction: in
+        interface: wg0
+        port: "22"
+        proto: tcp
+      - rule: allow
+        route: true
+        interface_in: wg0
+        interface_out: eth1
+        to_ip: 10.20.0.0/24
+      - rule: allow
+        port: "2222"
+        proto: tcp
+        delete: true
   tasks:
     - name: Include firewall role
       ansible.builtin.include_role:
