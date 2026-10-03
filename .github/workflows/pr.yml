@@ -131,7 +131,7 @@ jobs:
       - name: Molecule test
         if: ${{ matrix.run == 'true' }}
         working-directory: roles/${{ matrix.role }}
-        run: molecule test
+        run: molecule test --all
 
   check:
     name: Check
