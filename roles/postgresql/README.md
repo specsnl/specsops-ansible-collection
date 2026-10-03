@@ -1,7 +1,8 @@
 # specsnl.specsops.postgresql
 
 PostgreSQL setup for Ubuntu 26.04: adds the official PGDG apt repository, installs
-the specified version, deploys a tuning configuration, manages connection access,
+the specified version, optionally moves the cluster to a data directory of your
+choosing, deploys a tuning configuration, manages connection access,
 enables the service, and optionally opens the port in ufw.
 
 ## Variables
@@ -13,6 +14,7 @@ enables the service, and optionally opens the port in ufw.
 | `postgresql_pgdg_key_url`     | `https://www.postgresql.org/media/keys/ACCC4CF8.asc` | PGDG signing key URL              |
 | `postgresql_listen_addresses` | `localhost`                                          | `listen_addresses` value          |
 | `postgresql_timezone`         | `UTC`                                                | `timezone` and `log_timezone`     |
+| `postgresql_data_directory`   | `""`                                                 | Data directory (see below)        |
 | `postgresql_manage_firewall`  | `true`                                               | Open port in ufw (see below)      |
 | `postgresql_hba_entries`      | `[]`                                                 | Extra `pg_hba.conf` entries       |
 | `postgresql_tuning`           | see below                                            | Map of postgresql.conf parameters |
@@ -41,6 +43,39 @@ postgresql_hba_entries:
     user: app
     address: 10.0.0.0/8
     method: scram-sha-256
+```
+
+## Data directory
+
+`postgresql_data_directory` keeps the cluster's data somewhere other than the Debian
+default `/var/lib/postgresql/<version>/main` — typically a block volume, so the VM
+can be rebuilt from an image and the data reattached. Empty (the default) leaves the
+cluster where it is.
+
+This role does not mount anything. Mount the volume first, for example with the
+`block_volume` role. The parent of the target must exist, or the role fails, so that
+a volume that failed to mount does not get a fresh cluster written to the OS disk.
+
+What happens depends on what the target holds:
+
+- **Nothing, or it does not exist yet** — first use. The server is stopped and the
+  freshly initialised default cluster is copied in with `rsync -a`, owned by
+  `postgres` with mode `0700`.
+- **A `PG_VERSION` matching `postgresql_version`** — a rebuild. The cluster is adopted
+  as-is and never re-initialised.
+- **A `PG_VERSION` for another major version** — the role fails. Upgrade it with
+  `pg_upgradecluster` first.
+- **Anything else** — the role fails rather than delete or overwrite it. A fresh
+  filesystem holds `lost+found`, so point the variable at a subdirectory of the mount
+  point, not at the mount point itself.
+
+`data_directory` is then set in `postgresql.conf`, which is where `pg_ctlcluster`
+reads it from, and the server is restarted from the new location. The old default
+directory is left in place. Don't set `data_directory` in `conf.d` as well: it is
+included last and would win.
+
+```yaml
+postgresql_data_directory: /mnt/pgdata/main
 ```
 
 ## Contrib extensions

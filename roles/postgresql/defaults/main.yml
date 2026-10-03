@@ -10,6 +10,11 @@ postgresql_listen_addresses: localhost
 
 postgresql_timezone: UTC
 
+# Empty keeps the cluster in the Debian default /var/lib/postgresql/<version>/main.
+# Set it to a path on a mounted volume to keep the data off the OS disk; an empty
+# target gets the default cluster copied in, one holding PG_VERSION is adopted.
+postgresql_data_directory: ""
+
 # Only opens the port when the server actually listens off-loopback.
 postgresql_manage_firewall: true
 
