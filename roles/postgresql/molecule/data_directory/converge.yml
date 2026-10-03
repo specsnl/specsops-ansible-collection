@@ -1,0 +1,30 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  vars:
+    # Molecule's container runs systemd, so let the role start the server.
+    postgresql_in_container: false
+    postgresql_data_directory: /srv/pgdata/main
+  tasks:
+    - name: Include postgresql role on an empty data directory
+      ansible.builtin.include_role:
+        name: specsnl.specsops.postgresql
+
+    - name: Write a marker row
+      ansible.builtin.command:
+        argv:
+          - psql
+          - -v
+          - ON_ERROR_STOP=1
+          - -c
+          - >-
+            CREATE TABLE IF NOT EXISTS molecule_marker (id int PRIMARY KEY);
+            INSERT INTO molecule_marker VALUES (1) ON CONFLICT DO NOTHING
+      become_user: postgres
+      register: marker_insert
+      changed_when: "'INSERT 0 1' in marker_insert.stdout"
+
+    - name: Include postgresql role again to adopt the cluster
+      ansible.builtin.include_role:
+        name: specsnl.specsops.postgresql
