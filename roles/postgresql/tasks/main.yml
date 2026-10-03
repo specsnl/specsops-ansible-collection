@@ -97,39 +97,6 @@
     enabled: true
     state: "{{ 'started' if not postgresql_in_container else omit }}"
 
-# Opening the port while the server listens on loopback only would be
-# misleading, so the rule follows listen_addresses.
-- name: Decide whether a firewall rule is wanted
-  ansible.builtin.set_fact:
-    postgresql_firewall_wanted: >-
-      {{ postgresql_manage_firewall
-         and not (postgresql_in_container | bool)
-         and postgresql_listen_addresses not in ['localhost', '127.0.0.1', '::1'] }}
-
-# This role does not depend on the firewall role, so ufw may simply not be here.
-# Failing at this point would leave PostgreSQL already listening off-loopback.
-- name: Check whether ufw is installed
-  ansible.builtin.stat:
-    path: /usr/sbin/ufw
-  register: postgresql_ufw
-  when: postgresql_firewall_wanted | bool
-
-- name: Warn that the PostgreSQL port was left closed
-  ansible.builtin.debug:
-    msg: >-
-      WARNING: ufw is not installed, so {{ postgresql_port }}/tcp was not opened
-      while PostgreSQL listens on '{{ postgresql_listen_addresses }}'. Run the
-      specsnl.specsops.firewall role first, or set postgresql_manage_firewall to
-      false and manage the rule yourself.
-  when:
-    - postgresql_firewall_wanted | bool
-    - not postgresql_ufw.stat.exists
-
-- name: Allow PostgreSQL port through firewall
-  community.general.ufw:
-    rule: allow
-    port: "{{ postgresql_port | string }}"
-    proto: tcp
-  when:
-    - postgresql_firewall_wanted | bool
-    - postgresql_ufw.stat.exists
+- name: Manage PostgreSQL firewall rules
+  ansible.builtin.include_tasks: firewall.yml
+  when: not (postgresql_in_container | bool)
