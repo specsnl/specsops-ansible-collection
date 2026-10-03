@@ -1,4 +1,7 @@
 ---
 postgresql_data_conf_dir: "/etc/postgresql/{{ postgresql_version }}/main"
 postgresql_conf_d: "{{ postgresql_data_conf_dir }}/conf.d"
+postgresql_conf_file: "{{ postgresql_data_conf_dir }}/postgresql.conf"
 postgresql_hba_file: "{{ postgresql_data_conf_dir }}/pg_hba.conf"
+postgresql_default_data_directory: "/var/lib/postgresql/{{ postgresql_version }}/main"
+postgresql_cluster_service: "postgresql@{{ postgresql_version }}-main"

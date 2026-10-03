@@ -2,7 +2,10 @@
 argument_specs:
   main:
     short_description: PostgreSQL installation from PGDG
-    description: Adds the PGDG apt repository, installs PostgreSQL, deploys a tuning config, enables the service, and optionally opens the port in ufw.
+    description: >-
+      Adds the PGDG apt repository, installs PostgreSQL, optionally moves the cluster to a
+      configured data directory, deploys a tuning config, enables the service, and
+      optionally opens the port in ufw.
     options:
       postgresql_version:
         type: int
@@ -25,6 +28,16 @@ argument_specs:
         type: str
         default: UTC
         description: Value for both timezone and log_timezone.
+      postgresql_data_directory:
+        type: str
+        default: ""
+        description: >-
+          Absolute path to keep the cluster's data in, e.g. a subdirectory of a mounted
+          volume. Empty keeps the Debian default /var/lib/postgresql/<version>/main. The
+          parent must already exist. An empty or missing target gets the default cluster
+          copied in; one holding PG_VERSION is adopted as-is, and the role fails when that
+          is another major version. A non-empty target without PG_VERSION is never touched:
+          the role fails instead.
       postgresql_manage_firewall:
         type: bool
         default: true

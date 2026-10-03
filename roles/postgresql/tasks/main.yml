@@ -54,6 +54,10 @@
     state: present
     update_cache: true
 
+- name: Move the cluster to the configured data directory
+  ansible.builtin.include_tasks: data_directory.yml
+  when: postgresql_data_directory | length > 0
+
 - name: Ensure PostgreSQL conf.d directory exists
   ansible.builtin.file:
     path: "{{ postgresql_conf_d }}"
