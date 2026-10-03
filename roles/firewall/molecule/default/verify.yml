@@ -40,3 +40,18 @@
           ('22/tcp' in ufw_status.stdout or '22 ' in ufw_status.stdout) or
           ('22/tcp' in ufw_added_rules.stdout or '22 ' in ufw_added_rules.stdout)
         fail_msg: "SSH rule (port 22) not found in ufw rules"
+
+    # ufw show added reads the rule files, so it works with ufw left disabled in a container
+    - name: Assert the source-limited, interface and route rules are present
+      ansible.builtin.assert:
+        that: item in ufw_added_rules.stdout_lines
+        fail_msg: "Missing ufw rule: {{ item }}"
+      loop:
+        - "ufw allow from 10.20.0.16/28 to any port 5432 proto tcp comment 'app range'"
+        - ufw allow in on wg0 to any port 22 proto tcp
+        - ufw route allow in on wg0 out on eth1 to 10.20.0.0/24
+
+    - name: Assert the deleted bootstrap rule is gone
+      ansible.builtin.assert:
+        that: ufw_added_rules.stdout is not search('2222')
+        fail_msg: "Rule for port 2222 should have been deleted"

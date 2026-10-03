@@ -35,7 +35,7 @@ scenario:
     - destroy
     - syntax
     - create
-    # - prepare
+    - prepare
     - converge
     - idempotence
     # - side_effect
@@ -45,7 +45,7 @@ scenario:
   converge_sequence:
     # - dependency  # handled by Taskfile before molecule runs
     - create
-    # - prepare
+    - prepare
     - converge
   destroy_sequence:
     # - dependency  # handled by Taskfile before molecule runs
