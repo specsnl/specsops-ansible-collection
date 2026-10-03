@@ -1,0 +1,26 @@
+---
+- name: Prepare
+  hosts: all
+  become: true
+  tasks:
+    - name: Install ufw
+      ansible.builtin.apt:
+        name: ufw
+        state: present
+        update_cache: true
+
+    # Stand-ins for what converge must clean up or leave alone: the rule open to
+    # every source from before postgresql_firewall_sources, a rule for a source
+    # since dropped from the list, and a rule this role does not own.
+    - name: Seed PostgreSQL firewall rules
+      community.general.ufw:
+        rule: allow
+        port: "5432"
+        proto: tcp
+        from_ip: "{{ item.from_ip }}"
+        comment: "{{ item.comment | default(omit) }}"
+      loop:
+        - from_ip: any
+        - from_ip: 192.0.2.0/24
+          comment: specsnl.specsops.postgresql
+        - from_ip: 198.51.100.0/24
