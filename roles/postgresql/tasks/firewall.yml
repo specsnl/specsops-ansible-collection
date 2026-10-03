@@ -1,0 +1,110 @@
+---
+# Opening the port while the server listens on loopback only would be
+# misleading, so the rule follows listen_addresses.
+- name: Decide whether a firewall rule is wanted
+  ansible.builtin.set_fact:
+    postgresql_firewall_wanted: >-
+      {{ postgresql_manage_firewall
+         and postgresql_listen_addresses not in ['localhost', '127.0.0.1', '::1'] }}
+
+# This role does not depend on the firewall role, so ufw may simply not be here.
+# Failing at this point would leave PostgreSQL already listening off-loopback.
+- name: Check whether ufw is installed
+  ansible.builtin.stat:
+    path: /usr/sbin/ufw
+  register: postgresql_ufw
+  when: postgresql_firewall_wanted | bool
+
+- name: Warn that the PostgreSQL port was left closed
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: ufw is not installed, so {{ postgresql_port }}/tcp was not opened
+      while PostgreSQL listens on '{{ postgresql_listen_addresses }}'. Run the
+      specsnl.specsops.firewall role first, or set postgresql_manage_firewall to
+      false and manage the rule yourself.
+  when:
+    - postgresql_firewall_wanted | bool
+    - not postgresql_ufw.stat.exists
+
+- name: Warn that the PostgreSQL port is open to every source
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: PostgreSQL listens on '{{ postgresql_listen_addresses }}' and
+      postgresql_firewall_sources is empty, so {{ postgresql_port }}/tcp is open
+      to every source. List the networks that need access in
+      postgresql_firewall_sources.
+  when:
+    - postgresql_firewall_wanted | bool
+    - postgresql_ufw.stat.exists
+    - postgresql_firewall_sources | length == 0
+    - "'*' in (postgresql_listen_addresses | split(',') | map('trim'))"
+
+# Removing a source from the list would otherwise leave its rule active. Only
+# rules carrying this role's comment are considered, so rules added by hand or
+# by the firewall role for the same port are left alone.
+- name: Read the added ufw rules
+  ansible.builtin.command: ufw show added
+  register: postgresql_ufw_added
+  changed_when: false
+  when:
+    - postgresql_firewall_wanted | bool
+    - postgresql_ufw.stat.exists
+
+- name: Find PostgreSQL firewall rules for dropped sources
+  ansible.builtin.set_fact:
+    postgresql_firewall_stale: >-
+      {%- set stale = [] -%}
+      {%- for line in postgresql_ufw_added.stdout_lines -%}
+      {%-   set match = line | regex_search(postgresql_firewall_rule_regexp, '\\1', '\\2', '\\3', '\\4') -%}
+      {%-   if match -%}
+      {%-     set rule = {'port': match[2] or match[3],
+                          'from_ip': match[1] or 'any',
+                          'interface': match[0] or ''} -%}
+      {%-     if rule not in postgresql_firewall_rules -%}
+      {%-       set _ = stale.append(rule) -%}
+      {%-     endif -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ stale }}
+  when:
+    - postgresql_firewall_wanted | bool
+    - postgresql_ufw.stat.exists
+
+- name: Remove PostgreSQL firewall rules for dropped sources
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: tcp
+    from_ip: "{{ item.from_ip }}"
+    interface_in: "{{ item.interface | default(omit, true) }}"
+    delete: true
+  loop: "{{ postgresql_firewall_stale }}"
+  when:
+    - postgresql_firewall_wanted | bool
+    - postgresql_ufw.stat.exists
+
+# Releases before postgresql_firewall_sources opened the port to everyone
+# without the comment, so the cleanup above cannot see that rule.
+- name: Remove the PostgreSQL rule open to every source
+  community.general.ufw:
+    rule: allow
+    port: "{{ postgresql_port | string }}"
+    proto: tcp
+    delete: true
+  when:
+    - postgresql_firewall_wanted | bool
+    - postgresql_ufw.stat.exists
+    - postgresql_firewall_sources | length > 0
+
+- name: Allow PostgreSQL port through firewall
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: tcp
+    from_ip: "{{ item.from_ip }}"
+    interface_in: "{{ item.interface | default(omit, true) }}"
+    comment: "{{ postgresql_firewall_comment }}"
+  loop: "{{ postgresql_firewall_rules }}"
+  when:
+    - postgresql_firewall_wanted | bool
+    - postgresql_ufw.stat.exists

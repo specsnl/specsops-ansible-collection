@@ -6,3 +6,17 @@
     - name: Include postgresql role
       ansible.builtin.include_role:
         name: specsnl.specsops.postgresql
+
+    # The role skips the firewall in containers, and ufw show added works
+    # without enabling ufw, so the firewall tasks are run on their own as on a VM.
+    - name: Include postgresql firewall tasks
+      ansible.builtin.include_role:
+        name: specsnl.specsops.postgresql
+        tasks_from: firewall
+      vars:
+        postgresql_listen_addresses: "*"
+        postgresql_firewall_sources:
+          - from_ip: 10.20.0.16/28
+            interface: eth0
+          - from_ip: 10.30.0.0/24
+          - interface: eth1

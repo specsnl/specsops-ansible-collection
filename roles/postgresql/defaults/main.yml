@@ -18,6 +18,11 @@ postgresql_data_directory: ""
 # Only opens the port when the server actually listens off-loopback.
 postgresql_manage_firewall: true
 
+# Each entry becomes its own allow rule for postgresql_port/tcp. Keys: from_ip
+# (an address or network) and interface, both optional. Empty opens the port to
+# every source.
+postgresql_firewall_sources: []
+
 # Appended to pg_hba.conf inside an Ansible-managed marker block, leaving the
 # distribution's default local/peer rules intact. Each entry is a dict with
 # type, database, user, address (optional for local) and method.

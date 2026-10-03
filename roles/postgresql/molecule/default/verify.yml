@@ -85,3 +85,32 @@
       ansible.builtin.assert:
         that: pgdg_sources.stat.exists
         fail_msg: "/etc/apt/sources.list.d/pgdg.sources does not exist"
+
+    - name: Check ufw added rules
+      ansible.builtin.command: ufw show added
+      register: ufw_added_rules
+      changed_when: false
+
+    - name: Assert a rule exists per firewall source
+      ansible.builtin.assert:
+        that:
+          - >-
+            "ufw allow in on eth0 from 10.20.0.16/28 to any port 5432 proto tcp comment 'specsnl.specsops.postgresql'"
+            in ufw_added_rules.stdout_lines
+          - >-
+            "ufw allow from 10.30.0.0/24 to any port 5432 proto tcp comment 'specsnl.specsops.postgresql'"
+            in ufw_added_rules.stdout_lines
+          - >-
+            "ufw allow in on eth1 to any port 5432 proto tcp comment 'specsnl.specsops.postgresql'"
+            in ufw_added_rules.stdout_lines
+        fail_msg: "ufw is missing a rule for one of postgresql_firewall_sources"
+
+    - name: Assert dropped and open rules are gone, foreign rules kept
+      ansible.builtin.assert:
+        that:
+          - ufw_added_rules.stdout_lines | select('match', 'ufw allow 5432/tcp') | list | length == 0
+          - "'192.0.2.0/24' not in ufw_added_rules.stdout"
+          - >-
+            "ufw allow from 198.51.100.0/24 to any port 5432 proto tcp"
+            in ufw_added_rules.stdout_lines
+        fail_msg: "ufw rules for 5432 were not pruned as expected"
