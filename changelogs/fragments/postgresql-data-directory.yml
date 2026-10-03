@@ -1,0 +1,11 @@
+---
+minor_changes:
+  - >-
+    postgresql - new ``postgresql_data_directory`` option that keeps the cluster on a
+    separate volume, so the VM can be rebuilt and the data reattached. An empty target
+    gets the image's default cluster copied in with ``rsync -a``. A target that already
+    holds a cluster of the same major version is adopted as-is, and the role fails on a
+    major-version mismatch. A non-empty target without ``PG_VERSION`` is never deleted
+    or overwritten; the role fails instead, as it does when the parent directory is
+    missing. ``data_directory`` is set in ``postgresql.conf``. The default, an empty
+    string, keeps the Debian location.

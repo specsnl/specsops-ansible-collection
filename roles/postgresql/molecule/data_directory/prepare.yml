@@ -1,0 +1,32 @@
+---
+- name: Prepare
+  hosts: all
+  become: true
+  tasks:
+    # Stands in for the mounted volume.
+    - name: Create the volume directory
+      ansible.builtin.file:
+        path: /srv/pgdata
+        state: directory
+        mode: "0755"
+
+    - name: Create directories the role must refuse
+      ansible.builtin.file:
+        path: "/srv/pgdata/{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - foreign
+        - old
+
+    - name: Put a file in the foreign directory
+      ansible.builtin.copy:
+        content: "not a cluster\n"
+        dest: /srv/pgdata/foreign/keep.txt
+        mode: "0644"
+
+    - name: Mark the old directory as a PostgreSQL 17 cluster
+      ansible.builtin.copy:
+        content: "17\n"
+        dest: /srv/pgdata/old/PG_VERSION
+        mode: "0600"

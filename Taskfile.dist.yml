@@ -78,12 +78,12 @@ tasks:
         task: ansible:test:{{.ITEM}}
 
   ansible:test:*:
-    desc: Run molecule test for a single role (e.g. task ansible:test:postgresql)
+    desc: Run molecule test for every scenario of a single role (e.g. task ansible:test:postgresql)
     vars:
       ROLE: "{{index .MATCH 0}}"
     cmds:
       - task: _molecule
-        vars: { ROLE: "{{.ROLE}}", CMD: test }
+        vars: { ROLE: "{{.ROLE}}", CMD: test --all }
 
   ansible:converge:*:
     desc: Molecule converge (no destroy) for a role
