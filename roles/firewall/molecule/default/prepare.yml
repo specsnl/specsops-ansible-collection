@@ -1,0 +1,18 @@
+---
+# Stands in for a rule applied by an earlier run, so converge.yml can remove it
+# with a delete entry — prepare runs once, so idempotence still holds.
+- name: Prepare
+  hosts: all
+  become: true
+  tasks:
+    - name: Install ufw
+      ansible.builtin.apt:
+        name: ufw
+        state: present
+        update_cache: true
+
+    - name: Add the bootstrap rule converge deletes
+      community.general.ufw:
+        rule: allow
+        port: "2222"
+        proto: tcp
