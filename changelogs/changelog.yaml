@@ -122,3 +122,52 @@ releases:
     - 0.3.2-release-summary.yml
     - cloud-init-user-role.yml
     release_date: '2026-09-27'
+  0.4.0:
+    changes:
+      bugfixes:
+      - specsdeployd - the sudoers drop-in now parses under sudo-rs, which is ``sudo``
+        and ``visudo`` on Ubuntu 26.04. sudo-rs accepts only a lone trailing ``*``
+        in sudoers arguments and rejected ``systemctl restart app-*.service``, so
+        ``visudo`` failed the role. The restart now goes through ``/usr/libexec/specsdeployd/restart-app``,
+        a root-owned wrapper the role installs. It runs ``systemctl restart`` only
+        for a single unit name matching ``^app-[a-z0-9][a-z0-9-]*\.service$`` and
+        exits ``64`` for anything else, so specsdeployd still cannot restart units
+        that are not apps.
+      minor_changes:
+      - 'firewall - rule entries in ``firewall_rules`` and ``firewall_extra_rules``
+        now also take ``direction``, ``interface``, ``interface_in``, ``interface_out``,
+        ``from_ip``, ``from_port``, ``to_ip``, ``to_port``, ``route``, ``comment``
+        and ``delete``, so a rule can be limited to a source network or an interface,
+        match routed traffic, or remove a rule applied earlier. Removing an entry
+        from the list still leaves its rule active in ufw; closing it takes a ``delete:
+        true`` entry. Existing ``{rule, port, proto}`` entries keep working, with
+        ``port`` an alias of ``to_port``.'
+      - postgresql - new ``postgresql_data_directory`` option that keeps the cluster
+        on a separate volume, so the VM can be rebuilt and the data reattached. An
+        empty target gets the image's default cluster copied in with ``rsync -a``.
+        A target that already holds a cluster of the same major version is adopted
+        as-is, and the role fails on a major-version mismatch. A non-empty target
+        without ``PG_VERSION`` is never deleted or overwritten; the role fails instead,
+        as it does when the parent directory is missing. ``data_directory`` is set
+        in ``postgresql.conf``. The default, an empty string, keeps the Debian location.
+      - postgresql - new ``postgresql_firewall_sources`` limits the ufw rule for ``postgresql_port``
+        to given sources. Each entry has an optional ``from_ip`` and ``interface``
+        and becomes its own allow rule. The default ``[]`` keeps the port open to
+        every source, and the role now warns about that when ``postgresql_listen_addresses``
+        is ``'*'``. Rules are tagged with the ufw comment ``specsnl.specsops.postgresql``,
+        so rules for sources dropped from the list are removed. A non-empty list also
+        removes the rule open to every source, which earlier releases added. The firewall
+        tasks moved to ``tasks/firewall.yml``.
+      release_summary: Feature release. ``firewall`` rules can now be limited to a
+        source network or an interface, match routed traffic, or delete a rule applied
+        earlier. ``postgresql`` can keep its cluster on a separate volume through
+        ``postgresql_data_directory`` and limit its firewall rule to given sources
+        through ``postgresql_firewall_sources``. The ``specsdeployd`` sudoers drop-in
+        now parses under sudo-rs on Ubuntu 26.04.
+    fragments:
+    - 0.4.0-release-summary.yml
+    - firewall-rule-options.yml
+    - postgresql-data-directory.yml
+    - postgresql-firewall-sources.yml
+    - specsdeployd-sudo-rs.yml
+    release_date: '2026-10-06'
