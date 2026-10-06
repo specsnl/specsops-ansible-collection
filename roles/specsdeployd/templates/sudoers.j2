@@ -1,5 +1,7 @@
 # Managed by Ansible — specsnl.specsops.specsdeployd
 # The receiver runs unprivileged and escalates for exactly two commands: pulling
-# the new image, and restarting the Quadlet unit that runs it.
+# the new image, and restarting the Quadlet unit that runs it. The restart goes
+# through restart-app, which allows only app-*.service units; sudo-rs rejects
+# that glob in a sudoers argument.
 {{ specsdeployd_user }} ALL=(root) NOPASSWD: /usr/bin/podman pull *
-{{ specsdeployd_user }} ALL=(root) NOPASSWD: /usr/bin/systemctl restart app-*.service
+{{ specsdeployd_user }} ALL=(root) NOPASSWD: /usr/libexec/specsdeployd/restart-app *
