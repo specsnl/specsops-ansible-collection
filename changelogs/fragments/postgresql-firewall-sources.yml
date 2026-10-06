@@ -1,0 +1,11 @@
+---
+minor_changes:
+  - >-
+    postgresql - new ``postgresql_firewall_sources`` limits the ufw rule for
+    ``postgresql_port`` to given sources. Each entry has an optional ``from_ip`` and
+    ``interface`` and becomes its own allow rule. The default ``[]`` keeps the port
+    open to every source, and the role now warns about that when
+    ``postgresql_listen_addresses`` is ``'*'``. Rules are tagged with the ufw comment
+    ``specsnl.specsops.postgresql``, so rules for sources dropped from the list are
+    removed. A non-empty list also removes the rule open to every source, which
+    earlier releases added. The firewall tasks moved to ``tasks/firewall.yml``.

@@ -1,0 +1,112 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Query the server's data directory
+      ansible.builtin.command:
+        argv: [psql, -tAc, SHOW data_directory]
+      become_user: postgres
+      register: show_data_directory
+      changed_when: false
+
+    - name: Assert the server runs from the data directory
+      ansible.builtin.assert:
+        that: show_data_directory.stdout == '/srv/pgdata/main'
+        fail_msg: "SHOW data_directory returned '{{ show_data_directory.stdout }}'"
+
+    # pg_ctlcluster has to agree, or it would stop and start the wrong directory.
+    - name: List clusters
+      ansible.builtin.command:
+        argv: [pg_lsclusters, --no-header]
+      register: pg_lsclusters
+      changed_when: false
+
+    - name: Assert postgresql-common sees the data directory
+      ansible.builtin.assert:
+        that: "(pg_lsclusters.stdout.split())[5] == '/srv/pgdata/main'"
+        fail_msg: "pg_lsclusters reports: {{ pg_lsclusters.stdout }}"
+
+    - name: Read the marker row
+      ansible.builtin.command:
+        argv: [psql, -tAc, SELECT count(*) FROM molecule_marker]
+      become_user: postgres
+      register: marker_count
+      changed_when: false
+
+    - name: Assert the marker row survived the reconverge
+      ansible.builtin.assert:
+        that: marker_count.stdout == '1'
+        fail_msg: "Expected one marker row, got '{{ marker_count.stdout }}'"
+
+    - name: Stat the data directory
+      ansible.builtin.stat:
+        path: /srv/pgdata/main
+      register: data_dir
+
+    - name: Assert the data directory is owned by postgres with mode 0700
+      ansible.builtin.assert:
+        that:
+          - data_dir.stat.pw_name == 'postgres'
+          - data_dir.stat.mode == '0700'
+        fail_msg: "/srv/pgdata/main is {{ data_dir.stat.pw_name }} {{ data_dir.stat.mode }}"
+
+    - name: Include postgresql role with a missing parent
+      block:
+        - name: Include postgresql role
+          ansible.builtin.include_role:
+            name: specsnl.specsops.postgresql
+          vars:
+            postgresql_data_directory: /srv/unmounted/main
+        - name: Fail because the role did not
+          ansible.builtin.fail:
+            msg: The role accepted a data directory whose parent does not exist
+      rescue:
+        - name: Assert the role failed on the missing parent
+          ansible.builtin.assert:
+            that: "'/srv/unmounted does not exist' in ansible_failed_result.msg"
+            fail_msg: "Unexpected failure: {{ ansible_failed_result.msg }}"
+
+    - name: Include postgresql role on a non-empty directory without PG_VERSION
+      block:
+        - name: Include postgresql role
+          ansible.builtin.include_role:
+            name: specsnl.specsops.postgresql
+          vars:
+            postgresql_data_directory: /srv/pgdata/foreign
+        - name: Fail because the role did not
+          ansible.builtin.fail:
+            msg: The role accepted a non-empty directory without PG_VERSION
+      rescue:
+        - name: Assert the role refused the foreign directory
+          ansible.builtin.assert:
+            that: "'has no PG_VERSION' in ansible_failed_result.msg"
+            fail_msg: "Unexpected failure: {{ ansible_failed_result.msg }}"
+
+    - name: List the foreign directory
+      ansible.builtin.find:
+        paths: /srv/pgdata/foreign
+        file_type: any
+        hidden: true
+      register: foreign_contents
+
+    - name: Assert the foreign directory was left alone
+      ansible.builtin.assert:
+        that: foreign_contents.files | map(attribute='path') | list == ['/srv/pgdata/foreign/keep.txt']
+        fail_msg: "/srv/pgdata/foreign now holds {{ foreign_contents.files | map(attribute='path') | list }}"
+
+    - name: Include postgresql role on another major version's cluster
+      block:
+        - name: Include postgresql role
+          ansible.builtin.include_role:
+            name: specsnl.specsops.postgresql
+          vars:
+            postgresql_data_directory: /srv/pgdata/old
+        - name: Fail because the role did not
+          ansible.builtin.fail:
+            msg: The role adopted a PostgreSQL 17 cluster with postgresql_version 18
+      rescue:
+        - name: Assert the role refused the version mismatch
+          ansible.builtin.assert:
+            that: "'holds a PostgreSQL 17 cluster' in ansible_failed_result.msg"
+            fail_msg: "Unexpected failure: {{ ansible_failed_result.msg }}"

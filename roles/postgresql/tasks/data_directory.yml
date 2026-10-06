@@ -1,0 +1,157 @@
+---
+- name: Assert the data directory is an absolute path
+  ansible.builtin.assert:
+    that:
+      - postgresql_data_directory is match('/')
+      - postgresql_data_directory | regex_replace('/+$', '') | length > 0
+    fail_msg: "postgresql_data_directory must be an absolute path below /, got '{{ postgresql_data_directory }}'"
+    quiet: true
+
+- name: Normalise the data directory path
+  ansible.builtin.set_fact:
+    postgresql_data_directory_path: "{{ postgresql_data_directory | regex_replace('/+$', '') }}"
+
+- name: Stat the data directory's parent
+  ansible.builtin.stat:
+    path: "{{ postgresql_data_directory_path | dirname }}"
+  register: postgresql_data_parent
+
+# Creating a missing parent would silently put the data on the OS disk whenever
+# the volume failed to mount.
+- name: Fail when the data directory's parent is missing
+  ansible.builtin.fail:
+    msg: >-
+      {{ postgresql_data_directory_path | dirname }} does not exist. This role does not
+      mount anything: mount the volume (e.g. with the block_volume role) before running it.
+  when: not (postgresql_data_parent.stat.isdir | default(false))
+
+- name: Stat the data directory
+  ansible.builtin.stat:
+    path: "{{ postgresql_data_directory_path }}"
+  register: postgresql_data_dir
+
+- name: Fail when the data directory is not a directory
+  ansible.builtin.fail:
+    msg: "{{ postgresql_data_directory_path }} exists but is not a directory."
+  when:
+    - postgresql_data_dir.stat.exists
+    - not postgresql_data_dir.stat.isdir
+
+- name: Stat PG_VERSION in the data directory
+  ansible.builtin.stat:
+    path: "{{ postgresql_data_directory_path }}/PG_VERSION"
+  register: postgresql_data_pg_version
+
+- name: Read PG_VERSION from the data directory
+  ansible.builtin.slurp:
+    src: "{{ postgresql_data_directory_path }}/PG_VERSION"
+  register: postgresql_data_pg_version_content
+  when: postgresql_data_pg_version.stat.exists
+
+# Starting a newer server on an older cluster's files does not upgrade them; that
+# takes pg_upgradecluster.
+- name: Fail when the existing cluster is another major version
+  ansible.builtin.fail:
+    msg: >-
+      {{ postgresql_data_directory_path }} holds a PostgreSQL
+      {{ postgresql_data_pg_version_content.content | b64decode | trim }} cluster, but
+      postgresql_version is {{ postgresql_version }}. Upgrade the cluster with
+      pg_upgradecluster first; this role will not adopt it.
+  when:
+    - postgresql_data_pg_version.stat.exists
+    - (postgresql_data_pg_version_content.content | b64decode | trim) != (postgresql_version | string)
+
+- name: List the data directory's contents
+  ansible.builtin.find:
+    paths: "{{ postgresql_data_directory_path }}"
+    file_type: any
+    hidden: true
+  register: postgresql_data_contents
+  when:
+    - postgresql_data_dir.stat.exists
+    - not postgresql_data_pg_version.stat.exists
+
+- name: Fail when the data directory holds something other than a cluster
+  ansible.builtin.fail:
+    msg: >-
+      {{ postgresql_data_directory_path }} is not empty, but has no PG_VERSION, so it is
+      not a PostgreSQL data directory. Refusing to initialise a cluster over it. A fresh
+      filesystem's mount point holds lost+found, so point postgresql_data_directory at a
+      subdirectory of the mount instead.
+  when:
+    - postgresql_data_contents.matched | default(0) > 0
+
+- name: Read postgresql.conf
+  ansible.builtin.slurp:
+    src: "{{ postgresql_conf_file }}"
+  register: postgresql_conf_content
+
+- name: Decide whether the cluster has to move
+  ansible.builtin.set_fact:
+    postgresql_data_directory_switch: >-
+      {{ not postgresql_data_pg_version.stat.exists
+         or (postgresql_conf_content.content | b64decode
+             | regex_findall("^[ \t]*data_directory[ \t]*=[ \t]*'([^']*)'", multiline=True)
+             | last | default('')) != postgresql_data_directory_path }}
+
+# Before postgresql.conf changes, so the stop acts on the directory the server
+# is running from.
+- name: Stop the PostgreSQL cluster before moving it
+  ansible.builtin.systemd_service:
+    name: "{{ postgresql_cluster_service }}"
+    state: stopped
+  when: postgresql_data_directory_switch | bool
+
+- name: Install rsync
+  ansible.builtin.apt:
+    name: rsync
+    state: present
+  when: not postgresql_data_pg_version.stat.exists
+
+- name: Create the data directory
+  ansible.builtin.file:
+    path: "{{ postgresql_data_directory_path }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0700"
+  when: not postgresql_data_pg_version.stat.exists
+
+# PG_VERSION goes last: it is what marks the directory as a cluster to adopt, so
+# an interrupted copy is refused on the next run instead of being started.
+- name: Copy the default cluster into the data directory
+  ansible.builtin.command:
+    argv:
+      - rsync
+      - -a
+      - --exclude=/PG_VERSION
+      - "{{ postgresql_default_data_directory }}/"
+      - "{{ postgresql_data_directory_path }}/"
+    creates: "{{ postgresql_data_directory_path }}/PG_VERSION"
+  when: not postgresql_data_pg_version.stat.exists
+
+- name: Copy PG_VERSION into the data directory
+  ansible.builtin.command:
+    argv:
+      - rsync
+      - -a
+      - "{{ postgresql_default_data_directory }}/PG_VERSION"
+      - "{{ postgresql_data_directory_path }}/PG_VERSION"
+    creates: "{{ postgresql_data_directory_path }}/PG_VERSION"
+  when: not postgresql_data_pg_version.stat.exists
+
+# Replaces Debian's own line in postgresql.conf. pg_ctlcluster also follows
+# include_dir, so a data_directory set in conf.d would still win over this one.
+- name: Point data_directory at the data directory
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_conf_file }}"
+    regexp: "^#?\\s*data_directory\\s*="
+    line: "data_directory = '{{ postgresql_data_directory_path }}'"
+
+- name: Start the PostgreSQL cluster from the data directory
+  ansible.builtin.systemd_service:
+    name: "{{ postgresql_cluster_service }}"
+    state: started
+  when:
+    - postgresql_data_directory_switch | bool
+    - not postgresql_in_container

@@ -1,4 +1,24 @@
 ---
 postgresql_data_conf_dir: "/etc/postgresql/{{ postgresql_version }}/main"
 postgresql_conf_d: "{{ postgresql_data_conf_dir }}/conf.d"
+postgresql_conf_file: "{{ postgresql_data_conf_dir }}/postgresql.conf"
 postgresql_hba_file: "{{ postgresql_data_conf_dir }}/pg_hba.conf"
+postgresql_default_data_directory: "/var/lib/postgresql/{{ postgresql_version }}/main"
+postgresql_cluster_service: "postgresql@{{ postgresql_version }}-main"
+
+postgresql_firewall_comment: specsnl.specsops.postgresql
+# Matches this role's lines in `ufw show added`. Groups: interface, source, port
+# (long form), port (short form, printed for a rule open to every source).
+postgresql_firewall_rule_regexp: >-
+  ^ufw allow (?:in on (\S+) )?(?:from (\S+) )?(?:to any port (\d+) proto tcp|(\d+)/tcp)
+  comment '{{ postgresql_firewall_comment | regex_escape }}'$
+# One rule per source, spelled the way the regexp above reads them back so that
+# stale rules can be told apart. No sources is a single rule open to everyone.
+postgresql_firewall_rules: >-
+  {%- set rules = [] -%}
+  {%- for source in postgresql_firewall_sources or [{}] -%}
+  {%-   set _ = rules.append({'port': postgresql_port | string,
+                              'from_ip': source.from_ip | default('any', true),
+                              'interface': source.interface | default('', true)}) -%}
+  {%- endfor -%}
+  {{ rules }}

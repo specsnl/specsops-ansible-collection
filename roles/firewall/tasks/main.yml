@@ -39,8 +39,19 @@
 - name: Apply firewall rules
   community.general.ufw:
     rule: "{{ item.rule }}"
-    port: "{{ item.port | default(omit) }}"
+    direction: "{{ item.direction | default(omit) }}"
+    interface: "{{ item.interface | default(omit) }}"
+    interface_in: "{{ item.interface_in | default(omit) }}"
+    interface_out: "{{ item.interface_out | default(omit) }}"
+    from_ip: "{{ item.from_ip | default(omit) }}"
+    from_port: "{{ item.from_port | default(omit) }}"
+    to_ip: "{{ item.to_ip | default(omit) }}"
+    # port is the module's alias of to_port; passing both would conflict
+    to_port: "{{ item.to_port | default(item.port | default(omit)) }}"
     proto: "{{ item.proto | default(omit) }}"
+    route: "{{ item.route | default(omit) }}"
+    comment: "{{ item.comment | default(omit) }}"
+    delete: "{{ item.delete | default(omit) }}"
   loop: "{{ firewall_rules + firewall_extra_rules }}"
 
 - name: Enable ufw

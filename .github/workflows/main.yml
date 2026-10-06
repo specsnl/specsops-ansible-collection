@@ -55,7 +55,7 @@ jobs:
           ansible-galaxy collection install . --force
       - name: Molecule test
         working-directory: roles/${{ matrix.role }}
-        run: molecule test
+        run: molecule test --all
 
   check:
     name: Check
