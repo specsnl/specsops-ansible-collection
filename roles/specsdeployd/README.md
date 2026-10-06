@@ -68,11 +68,21 @@ and escalates through `/etc/sudoers.d/specsdeployd` for exactly two commands:
 
 ```sudoers
 specsdeployd ALL=(root) NOPASSWD: /usr/bin/podman pull *
-specsdeployd ALL=(root) NOPASSWD: /usr/bin/systemctl restart app-*.service
+specsdeployd ALL=(root) NOPASSWD: /usr/libexec/specsdeployd/restart-app *
 ```
 
+`restart-app` is a small root-owned script the role installs. It takes exactly one
+argument matching `^app-[a-z0-9][a-z0-9-]*\.service$` and runs
+`systemctl restart` on it; anything else exits `64`. A sudoers glob such as
+`systemctl restart app-*.service` cannot express that limit: sudo-rs, which is `sudo` on
+Ubuntu 26.04, accepts only a lone trailing `*` in arguments, and `systemctl restart *`
+would let the receiver restart `ssh` or `caddy`. The script and
+`/usr/libexec/specsdeployd` are `root:root` `0755`. If the receiver could write either
+one, its sudo rule would amount to root access.
+
 The file is written through `visudo -cf`, so a malformed drop-in can never land and take
-`sudo` down with it. The unit deliberately does **not** set `NoNewPrivileges`, which
+`sudo` down with it. The role's molecule scenario parses it with both classic sudo's and
+sudo-rs's `visudo`. The unit deliberately does **not** set `NoNewPrivileges`, which
 would block both escalations.
 
 ## Out of scope
