@@ -1,0 +1,28 @@
+#!/bin/sh
+# Managed by Ansible — specsnl.specsops.specsdeployd
+# The restart half of the sudoers drop-in. sudo-rs takes only a lone trailing *
+# in sudoers arguments, so the app-*.service limit lives here: a single unit name
+# matching ^app-[a-z0-9][a-z0-9-]*\.service$, or exit 64.
+set -eu
+
+reject() {
+    echo "restart-app: expected one app-<name>.service unit name" >&2
+    exit 64
+}
+
+[ "$#" -eq 1 ] || reject
+
+case $1 in
+    app-*.service) ;;
+    *) reject ;;
+esac
+
+name=${1#app-}
+name=${name%.service}
+
+# Spelled out rather than [a-z0-9]: bracket ranges follow the locale's collation.
+case $name in
+    '' | -* | *[!abcdefghijklmnopqrstuvwxyz0123456789-]*) reject ;;
+esac
+
+exec /usr/bin/systemctl restart "$1"

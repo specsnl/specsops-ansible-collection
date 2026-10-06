@@ -79,6 +79,29 @@
         that: specsdeployd_visudo.rc == 0
         fail_msg: "visudo rejects /etc/sudoers.d/specsdeployd: {{ specsdeployd_visudo.stderr }}"
 
+    # The image points sudo at classic sudo, which accepts globs that sudo-rs — the
+    # 26.04 default on real hosts — rejects. Installing sudo-rs would take over the
+    # auto-mode alternative (priority 50 over 40), so it is pinned first.
+    - name: Pin the sudo alternative to classic sudo
+      ansible.builtin.command: update-alternatives --set sudo /usr/bin/sudo.ws
+      changed_when: false
+
+    - name: Install sudo-rs
+      ansible.builtin.apt:
+        name: sudo-rs
+        update_cache: true
+
+    - name: Parse the sudoers drop-in with sudo-rs's visudo
+      ansible.builtin.command: /usr/lib/cargo/bin/visudo -cf /etc/sudoers.d/specsdeployd
+      register: specsdeployd_visudo_rs
+      changed_when: false
+      failed_when: false
+
+    - name: Assert sudo-rs's visudo parses the drop-in
+      ansible.builtin.assert:
+        that: specsdeployd_visudo_rs.rc == 0
+        fail_msg: "sudo-rs's visudo rejects /etc/sudoers.d/specsdeployd: {{ specsdeployd_visudo_rs.stderr }}"
+
     - name: Read the sudoers drop-in
       ansible.builtin.slurp:
         src: /etc/sudoers.d/specsdeployd
@@ -88,11 +111,72 @@
       ansible.builtin.assert:
         that:
           - "'specsdeployd ALL=(root) NOPASSWD: /usr/bin/podman pull *' in specsdeployd_sudoers_lines"
-          - "'specsdeployd ALL=(root) NOPASSWD: /usr/bin/systemctl restart app-*.service' in specsdeployd_sudoers_lines"
+          - "'specsdeployd ALL=(root) NOPASSWD: /usr/libexec/specsdeployd/restart-app *' in specsdeployd_sudoers_lines"
           - specsdeployd_sudoers_lines | reject('match', '^#') | reject('equalto', '') | list | length == 2
-        fail_msg: "the sudoers drop-in does not grant exactly podman pull and systemctl restart app-*"
+        fail_msg: "the sudoers drop-in does not grant exactly podman pull and restart-app"
       vars:
         specsdeployd_sudoers_lines: "{{ (specsdeployd_sudoers_content.content | b64decode).splitlines() }}"
+
+    - name: Stat the restart-app wrapper and its directory
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /usr/libexec/specsdeployd
+        - /usr/libexec/specsdeployd/restart-app
+      register: specsdeployd_wrapper_paths
+
+    # Either one writable by the receiver would make its sudo rule root access.
+    - name: Assert the wrapper and its directory are root-owned 0755
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+          - item.stat.mode == '0755'
+          - item.stat.pw_name == 'root'
+          - item.stat.gr_name == 'root'
+        fail_msg: "{{ item.item }} is missing or not root:root 0755"
+      loop: "{{ specsdeployd_wrapper_paths.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Run the wrapper with arguments it must refuse
+      ansible.builtin.command:
+        argv: "{{ ['/usr/libexec/specsdeployd/restart-app'] + item }}"
+      loop:
+        - [ssh.service]
+        - [-x]
+        - [app-x.service, --now]
+        - ["app-x.service; id"]
+        - [app-X.service]
+        - []
+      register: specsdeployd_wrapper_refused
+      changed_when: false
+      failed_when: false
+
+    - name: Assert the wrapper refuses them with exit 64
+      ansible.builtin.assert:
+        that:
+          - item.rc == 64
+          - item.stderr | length > 0
+        fail_msg: "restart-app {{ item.item }} exited {{ item.rc }}, expected 64 with a message on stderr"
+      loop: "{{ specsdeployd_wrapper_refused.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    # No such unit exists, so systemctl itself fails — after the wrapper let it through.
+    - name: Run the wrapper with a valid app unit name
+      ansible.builtin.command: /usr/libexec/specsdeployd/restart-app app-specsdeployd-verify.service
+      register: specsdeployd_wrapper_accepted
+      changed_when: false
+      failed_when: false
+
+    - name: Assert the wrapper hands a valid name to systemctl
+      ansible.builtin.assert:
+        that:
+          - specsdeployd_wrapper_accepted.rc != 64
+          - "'app-specsdeployd-verify.service' in specsdeployd_wrapper_accepted.stderr"
+        fail_msg: >-
+          restart-app did not pass app-specsdeployd-verify.service on to systemctl
+          (rc={{ specsdeployd_wrapper_accepted.rc }}, {{ specsdeployd_wrapper_accepted.stderr }})
 
     - name: Stat the unit file
       ansible.builtin.stat:

@@ -15,6 +15,25 @@
     group: "{{ specsdeployd_user }}"
     mode: "0750"
 
+# The sudoers rule hands this script any arguments as root, so neither it nor its
+# directory may be writable by the receiver. Installed first, so the rule never
+# names a missing file.
+- name: Ensure the specsdeployd libexec directory exists
+  ansible.builtin.file:
+    path: /usr/libexec/specsdeployd
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the restart-app wrapper
+  ansible.builtin.template:
+    src: restart-app.sh.j2
+    dest: /usr/libexec/specsdeployd/restart-app
+    owner: root
+    group: root
+    mode: "0755"
+
 # A sudoers file that does not parse takes sudo down for every user on the host,
 # and this one is templated from a variable. validate writes it through visudo or
 # not at all.
