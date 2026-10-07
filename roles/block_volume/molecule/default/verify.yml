@@ -1,0 +1,94 @@
+---
+# A container cannot attach or mount a block device, so this scenario can only
+# prove the fstab entries and the systemd drop-ins. Finding, formatting and
+# mounting the volume have to be verified on a real VM — see the role README.
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Read fstab
+      ansible.builtin.slurp:
+        src: /etc/fstab
+      register: block_volume_fstab
+
+    - name: Assert the volumes are in fstab by label, without nofail
+      ansible.builtin.assert:
+        that:
+          - (block_volume_fstab.content | b64decode) is search('(?m)^LABEL=pgdata /srv/pgdata ext4 defaults,noatime 0 0$')
+          - (block_volume_fstab.content | b64decode) is search('(?m)^LABEL=scratch /srv/scratch xfs defaults 0 0$')
+          - "'nofail' not in (block_volume_fstab.content | b64decode)"
+        fail_msg: "/etc/fstab does not hold the expected volume entries"
+
+    - name: Stat the mount points
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: block_volume_mount_points
+      loop:
+        - /srv/pgdata
+        - /srv/scratch
+
+    - name: Assert no mount point was created in a container
+      ansible.builtin.assert:
+        that: block_volume_mount_points.results | selectattr('stat.exists') | list | length == 0
+        fail_msg: "A mount point was created inside a container — the container guard failed"
+
+    - name: Read the drop-ins
+      ansible.builtin.slurp:
+        src: "/etc/systemd/system/{{ item }}.d/block-volume-pgdata.conf"
+      register: block_volume_dropins
+      loop:
+        - postgresql@18-main.service
+        - block-volume-test.service
+
+    - name: Assert the drop-ins require the mount
+      ansible.builtin.assert:
+        that: "'RequiresMountsFor=/srv/pgdata' in (item.content | b64decode).splitlines()"
+        fail_msg: "{{ item.item }} does not require /srv/pgdata"
+      loop: "{{ block_volume_dropins.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    # Proves systemd parses the drop-in, not just that the file is there.
+    - name: Install a test unit for the drop-in
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/block-volume-test.service
+        content: |
+          [Service]
+          Type=oneshot
+          ExecStart=/bin/true
+        mode: "0644"
+
+    - name: Reload systemd
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
+    - name: Read RequiresMountsFor of the test unit
+      ansible.builtin.command: systemctl show --property=RequiresMountsFor --value block-volume-test.service
+      register: block_volume_test_unit
+      changed_when: false
+
+    - name: Assert systemd applies the drop-in
+      ansible.builtin.assert:
+        that: "'/srv/pgdata' in block_volume_test_unit.stdout.split()"
+        fail_msg: "systemd reports RequiresMountsFor={{ block_volume_test_unit.stdout }}"
+
+    - name: Run the role as if on a VM without the volume attached
+      block:
+        - name: Include block_volume role outside the container guard
+          ansible.builtin.include_role:
+            name: specsnl.specsops.block_volume
+          vars:
+            block_volume_in_container: false
+            block_volume_devices:
+              - storage_uuid: 01d4fcd4-e446-433b-8a9c-551a1284952e
+                label: pgdata
+                mount_point: /srv/pgdata
+
+        - name: Fail when the role did not fail
+          ansible.builtin.fail:
+            msg: The role did not fail for a volume that is not attached
+      rescue:
+        - name: Assert the role names the missing by-id link
+          ansible.builtin.assert:
+            that: "'/dev/disk/by-id/virtio-01d4fcd4e446433b8a9c' in ansible_failed_result.msg"
+            fail_msg: "Unexpected failure: {{ ansible_failed_result.msg | default(ansible_failed_result) }}"

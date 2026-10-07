@@ -1,0 +1,73 @@
+---
+argument_specs:
+  main:
+    short_description: Block storage volumes mounted by label
+    description: >-
+      Finds each attached UpCloud block storage volume by its storage UUID, creates a
+      filesystem on it only when it has none, labels it, mounts it by label, and makes
+      the given systemd units require the mount. In containers only the fstab entry
+      and the systemd drop-ins are written.
+    options:
+      block_volume_devices:
+        type: list
+        elements: dict
+        default: []
+        description: Volumes to set up.
+        options:
+          storage_uuid:
+            type: str
+            required: true
+            description: >-
+              UpCloud storage UUID of the attached disk. The role looks for it at
+              /dev/disk/by-id/virtio-<first 20 characters of the UUID without dashes>
+              and fails when it is not there.
+          label:
+            type: str
+            required: true
+            description: >-
+              Filesystem label, set at creation or on an existing filesystem without one,
+              and mounted as LABEL=<label>. At most 16 characters (12 for xfs) of letters,
+              digits, '-' and '_'. The role fails when the disk carries another label, or
+              another disk carries this one.
+          mount_point:
+            type: str
+            required: true
+            description: Absolute path to mount the volume on. Created when missing.
+          fstype:
+            type: str
+            choices: [ext4, ext3, ext2, xfs]
+            description: >-
+              Filesystem to create on an empty disk. Defaults to block_volume_fstype. A disk
+              holding a filesystem of another type fails the role and is never reformatted.
+          mount_opts:
+            type: str
+            description: Mount options. Defaults to block_volume_mount_opts.
+          owner:
+            type: str
+            description: Owner of the mounted filesystem's root. Left alone when unset.
+          group:
+            type: str
+            description: Group of the mounted filesystem's root. Left alone when unset.
+          mode:
+            type: str
+            description: Mode of the mounted filesystem's root, e.g. "0750". Left alone when unset.
+          required_by:
+            type: list
+            elements: str
+            default: []
+            description: >-
+              systemd units that get a RequiresMountsFor=<mount_point> drop-in, so they
+              only start with the volume mounted. A name without a unit type, such as
+              postgresql@18-main, is taken as a service.
+      block_volume_fstype:
+        type: str
+        default: ext4
+        choices: [ext4, ext3, ext2, xfs]
+        description: Filesystem for entries that do not set fstype.
+      block_volume_mount_opts:
+        type: str
+        default: defaults,noatime
+        description: >-
+          Mount options for entries that do not set mount_opts. Leave out nofail: a
+          missing volume must stop the units that need it, not let them write to the
+          OS disk.

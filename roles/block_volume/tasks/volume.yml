@@ -1,0 +1,148 @@
+---
+# required_by entries without a unit type, e.g. postgresql@18-main, are services.
+- name: Set facts for {{ block_volume_device.label }}
+  ansible.builtin.set_fact:
+    block_volume_by_id: "/dev/disk/by-id/virtio-{{ (block_volume_device.storage_uuid | replace('-', '') | lower)[:20] }}"
+    block_volume_fs: "{{ block_volume_device.fstype | default(block_volume_fstype) }}"
+    block_volume_units: >-
+      {{ block_volume_device.required_by | default([])
+         | map('regex_replace',
+               '^(?!.+\.(service|socket|timer|target|path|mount|automount|swap|slice|scope)$)(.+)$',
+               '\2.service')
+         | list }}
+
+- name: Format the volume if it is empty — {{ block_volume_device.label }}
+  when: not (block_volume_in_container | bool)
+  block:
+    - name: Stat the by-id link of {{ block_volume_device.label }}
+      ansible.builtin.stat:
+        path: "{{ block_volume_by_id }}"
+      register: block_volume_link
+
+    - name: List the disks under /dev/disk/by-id
+      ansible.builtin.find:
+        paths: /dev/disk/by-id
+        file_type: link
+      register: block_volume_by_id_links
+      when: not block_volume_link.stat.exists
+
+    - name: Fail when the volume is not attached — {{ block_volume_device.label }}
+      ansible.builtin.fail:
+        msg: >-
+          {{ block_volume_device.label }}: no disk at {{ block_volume_by_id }} for storage
+          {{ block_volume_device.storage_uuid }}. Is it attached to this server on the virtio bus?
+          /dev/disk/by-id holds: {{ block_volume_by_id_links.files | map(attribute='path')
+          | map('basename') | sort | join(', ') or 'nothing' }}.
+      when: not block_volume_link.stat.exists
+
+    - name: Probe {{ block_volume_device.label }}
+      ansible.builtin.command: "blkid -p -o export {{ block_volume_link.stat.lnk_source }}"
+      register: block_volume_probe
+      changed_when: false
+      failed_when: block_volume_probe.rc not in [0, 2]
+
+    - name: Parse the probe of {{ block_volume_device.label }}
+      ansible.builtin.set_fact:
+        block_volume_blkid: >-
+          {{ dict(block_volume_probe.stdout_lines
+                  | select('match', '^[A-Z_]+=')
+                  | map('regex_findall', '^([A-Z_]+)=(.*)$')
+                  | map('first')) }}
+
+    # filesystem passes mkfs its force flag whenever it creates one, and blkid
+    # reports no TYPE for a partitioned disk, so the module alone would format it.
+    - name: Fail when the volume is partitioned — {{ block_volume_device.label }}
+      ansible.builtin.fail:
+        msg: >-
+          {{ block_volume_device.label }}: {{ block_volume_link.stat.lnk_source }} holds a
+          {{ block_volume_blkid.PTTYPE }} partition table. The role only formats a whole,
+          empty disk and will not touch this one.
+      when: block_volume_blkid.PTTYPE is defined
+
+    - name: Fail when the volume carries another label — {{ block_volume_device.label }}
+      ansible.builtin.fail:
+        msg: >-
+          {{ block_volume_device.label }}: {{ block_volume_link.stat.lnk_source }} already
+          holds a filesystem labelled {{ block_volume_blkid.LABEL }}. Check that this is
+          the right disk, then relabel it by hand or change the label in the inventory.
+      when: block_volume_blkid.LABEL | default('') not in ['', block_volume_device.label]
+
+    - name: Install xfsprogs
+      ansible.builtin.apt:
+        name: xfsprogs
+        state: present
+      when: block_volume_fs == 'xfs'
+
+    # force: false never reformats: a disk that already holds a filesystem of
+    # this type is left as it is, and one of another type fails the task.
+    - name: Create a filesystem if the volume has none — {{ block_volume_device.label }}
+      community.general.filesystem:
+        dev: "{{ block_volume_link.stat.lnk_source }}"
+        fstype: "{{ block_volume_fs }}"
+        opts: "-L {{ block_volume_device.label }}"
+        force: false
+      register: block_volume_mkfs
+
+    - name: Label the existing filesystem on {{ block_volume_device.label }}
+      ansible.builtin.command: >-
+        {{ 'xfs_admin -L' if block_volume_fs == 'xfs' else 'e2label' }}
+        {{ block_volume_link.stat.lnk_source }} {{ block_volume_device.label }}
+      when:
+        - not block_volume_mkfs.changed
+        - block_volume_blkid.LABEL | default('') == ''
+      changed_when: true
+
+    # Mounting by label picks whichever disk blkid finds first, so a second disk
+    # with the same label would make the mount ambiguous.
+    - name: Find the disks labelled {{ block_volume_device.label }}
+      ansible.builtin.command: "blkid -c /dev/null -o device -t LABEL={{ block_volume_device.label }}"
+      register: block_volume_labelled
+      changed_when: false
+      failed_when: block_volume_labelled.rc not in [0, 2]
+
+    - name: Fail when another disk carries the label {{ block_volume_device.label }}
+      ansible.builtin.fail:
+        msg: >-
+          {{ block_volume_device.label }}: {{ block_volume_labelled.stdout_lines
+          | difference([block_volume_link.stat.lnk_source]) | join(', ') }} also carry
+          the label, so LABEL={{ block_volume_device.label }} does not name one disk.
+      when: block_volume_labelled.stdout_lines | difference([block_volume_link.stat.lnk_source]) | length > 0
+
+# No nofail: a missing data disk must stop the boot rather than let the services
+# that need it start and write to the OS disk underneath the mount point.
+- name: Mount {{ block_volume_device.label }}
+  ansible.posix.mount:
+    path: "{{ block_volume_device.mount_point }}"
+    src: "LABEL={{ block_volume_device.label }}"
+    fstype: "{{ block_volume_fs }}"
+    opts: "{{ block_volume_device.mount_opts | default(block_volume_mount_opts) }}"
+    state: "{{ 'present' if (block_volume_in_container | bool) else 'mounted' }}"
+  notify: Reload systemd
+
+- name: Set the owner and mode of {{ block_volume_device.mount_point }}
+  ansible.builtin.file:
+    path: "{{ block_volume_device.mount_point }}"
+    state: directory
+    owner: "{{ block_volume_device.owner | default(omit) }}"
+    group: "{{ block_volume_device.group | default(omit) }}"
+    mode: "{{ block_volume_device.mode | default(omit) }}"
+  when: not (block_volume_in_container | bool)
+
+- name: Ensure drop-in directories exist for {{ block_volume_device.label }}
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ item }}.d"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ block_volume_units }}"
+
+- name: Make dependent units require the mount — {{ block_volume_device.mount_point }}
+  ansible.builtin.template:
+    src: requires-mounts-for.conf.j2
+    dest: "/etc/systemd/system/{{ item }}.d/block-volume-{{ block_volume_device.label }}.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ block_volume_units }}"
+  notify: Reload systemd
