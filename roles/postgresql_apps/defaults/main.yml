@@ -1,0 +1,10 @@
+---
+# One entry per app. Keys: name, password, database (defaults to name),
+# allowed_cidr, auth_method (defaults to scram-sha-256) and state (present or
+# absent). An absent app loses its pg_hba line and its login; its database is
+# never dropped.
+postgresql_apps: []  # noqa: var-naming[no-role-prefix]
+
+# Port of the local server. The modules connect over its Unix socket, whose
+# file name carries the port.
+postgresql_apps_port: 5432

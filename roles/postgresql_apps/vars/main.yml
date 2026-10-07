@@ -1,0 +1,33 @@
+---
+postgresql_apps_hba_marker: "# {mark} ANSIBLE MANAGED BLOCK — specsnl.specsops.postgresql_apps"
+
+# Lowercase identifiers need no quoting, neither in SQL nor in pg_hba.conf.
+postgresql_apps_identifier_regexp: "^[a-z_][a-z0-9_]*$"
+# pg_hba keywords would widen the line to other roles or databases, and the rest
+# are the superuser, the template databases and names PostgreSQL reserves.
+postgresql_apps_reserved_names:
+  - all
+  - sameuser
+  - samerole
+  - samegroup
+  - replication
+  - postgres
+  - public
+  - template0
+  - template1
+
+# postgresql_apps with the defaults filled in and the password left out, so the
+# tasks that do not need it can loop and log freely.
+postgresql_apps_entries: >-
+  {%- set entries = [] -%}
+  {%- for app in postgresql_apps -%}
+  {%-   set _ = entries.append({'name': app.name,
+                                'database': app.database | default(app.name, true),
+                                'allowed_cidr': app.allowed_cidr | default(''),
+                                'auth_method': app.auth_method | default('scram-sha-256', true),
+                                'state': app.state | default('present', true),
+                                'has_password': app.password | default('') | length > 0}) -%}
+  {%- endfor -%}
+  {{ entries }}
+postgresql_apps_present: "{{ postgresql_apps_entries | selectattr('state', '==', 'present') | list }}"
+postgresql_apps_absent: "{{ postgresql_apps_entries | selectattr('state', '==', 'absent') | list }}"

@@ -1,0 +1,31 @@
+---
+# A reload keeps the old rules when the file does not parse and only logs it,
+# so the play would succeed with the new apps locked out. Handlers run in this
+# order, so a bad file fails the play before the reload.
+- name: Check pg_hba.conf for errors
+  community.postgresql.postgresql_query:
+    query: SELECT line_number, error FROM pg_hba_file_rules WHERE error IS NOT NULL
+    login_port: "{{ postgresql_apps_port }}"
+  register: postgresql_apps_hba_errors
+  changed_when: false
+  become: true
+  become_user: postgres
+  listen: postgresql_apps pg_hba changed
+
+- name: Fail on pg_hba.conf errors
+  ansible.builtin.fail:
+    msg: >-
+      {{ postgresql_apps_hba_file.query_result[0].hba_file }} has errors, so it was not
+      reloaded:
+      {% for row in postgresql_apps_hba_errors.query_result %}line {{ row.line_number }}: {{ row.error }}.{{ ' ' if not loop.last }}{% endfor %}
+  when: postgresql_apps_hba_errors.query_result | length > 0
+  listen: postgresql_apps pg_hba changed
+
+# A reload is enough for pg_hba.conf and leaves open connections alone.
+- name: Reload postgresql for postgresql_apps
+  community.postgresql.postgresql_query:
+    query: SELECT pg_reload_conf()
+    login_port: "{{ postgresql_apps_port }}"
+  become: true
+  become_user: postgres
+  listen: postgresql_apps pg_hba changed

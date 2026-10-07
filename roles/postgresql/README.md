@@ -111,8 +111,8 @@ since PostgreSQL 10 the modules (`pg_stat_statements`, `pgcrypto`, …) ship ins
 
 ## Out of scope
 
-Creating roles and databases is out of scope — do that in the consuming playbook with
-`community.postgresql`.
+Creating roles and databases is out of scope. The `postgresql_apps` role gives each app
+its own login role, database and `pg_hba.conf` line.
 
 ## Tuning defaults
 

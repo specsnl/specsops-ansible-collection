@@ -12,6 +12,7 @@ vars:
     - hardening
     - unattended_upgrades
     - postgresql
+    - postgresql_apps
     - swap
     - logrotate
     - cleanup

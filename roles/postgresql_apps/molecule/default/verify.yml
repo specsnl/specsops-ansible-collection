@@ -1,0 +1,195 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  vars:
+    app_address: "{{ ansible_facts['default_ipv4']['address'] }}"
+    app_databases:
+      app_one: app_one
+      app_two: app_two_db
+  tasks:
+    - name: Connect each app to its own database over TCP
+      ansible.builtin.command:
+        argv:
+          - psql
+          - "host={{ app_address }} dbname={{ app_databases[item] }} user={{ item }}"
+          - -tAc
+          - SELECT current_user || '@' || current_database()
+      environment:
+        PGPASSWORD: "{{ molecule_app_passwords[item] }}"
+      loop: [app_one, app_two]
+      register: own_database
+      changed_when: false
+
+    - name: Assert each app reached its own database
+      ansible.builtin.assert:
+        that: item.stdout == item.item ~ '@' ~ app_databases[item.item]
+        fail_msg: "{{ item.item }} connected as '{{ item.stdout }}'"
+      loop: "{{ own_database.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Connect each app to the other app's database over TCP
+      ansible.builtin.command:
+        argv:
+          - psql
+          - "host={{ app_address }} dbname={{ item.database }} user={{ item.user }}"
+          - -tAc
+          - SELECT 1
+      environment:
+        PGPASSWORD: "{{ molecule_app_passwords[item.user] }}"
+      loop:
+        - { user: app_one, database: app_two_db }
+        - { user: app_two, database: app_one }
+      register: other_database
+      changed_when: false
+      failed_when: false
+
+    - name: Assert pg_hba.conf refused each app on the other app's database
+      ansible.builtin.assert:
+        that:
+          - item.rc != 0
+          - "'no pg_hba.conf entry for host' in item.stderr"
+        fail_msg: "{{ item.item.user }} on {{ item.item.database }}: rc={{ item.rc }} {{ item.stderr }}"
+      loop: "{{ other_database.results }}"
+      loop_control:
+        label: "{{ item.item.user }} -> {{ item.item.database }}"
+
+    # Debian's own 127.0.0.1 rule lets every role in, so the revoked CONNECT is
+    # what has to stop them here.
+    - name: Connect each app to the other app's database over loopback
+      ansible.builtin.command:
+        argv:
+          - psql
+          - "host=127.0.0.1 dbname={{ item.database }} user={{ item.user }}"
+          - -tAc
+          - SELECT 1
+      environment:
+        PGPASSWORD: "{{ molecule_app_passwords[item.user] }}"
+      loop:
+        - { user: app_one, database: app_two_db }
+        - { user: app_two, database: app_one }
+      register: other_database_loopback
+      changed_when: false
+      failed_when: false
+
+    - name: Assert CONNECT refused each app on the other app's database
+      ansible.builtin.assert:
+        that:
+          - item.rc != 0
+          - "'permission denied for database' in item.stderr"
+        fail_msg: "{{ item.item.user }} on {{ item.item.database }}: rc={{ item.rc }} {{ item.stderr }}"
+      loop: "{{ other_database_loopback.results }}"
+      loop_control:
+        label: "{{ item.item.user }} -> {{ item.item.database }}"
+
+    - name: Query the app databases' owners
+      ansible.builtin.command:
+        argv:
+          - psql
+          - -tAc
+          - >-
+            SELECT string_agg(datname || '=' || pg_get_userbyid(datdba), ',' ORDER BY datname)
+            FROM pg_database WHERE datname IN ('app_one', 'app_two_db', 'app_retired')
+      become_user: postgres
+      register: database_owners
+      changed_when: false
+
+    - name: Assert each database exists and is owned by its app
+      ansible.builtin.assert:
+        that: database_owners.stdout == 'app_one=app_one,app_retired=app_retired,app_two_db=app_two'
+        fail_msg: "Databases and owners: {{ database_owners.stdout }}"
+
+    - name: Query the retired app's login
+      ansible.builtin.command:
+        argv: [psql, -tAc, "SELECT rolcanlogin FROM pg_roles WHERE rolname = 'app_retired'"]
+      become_user: postgres
+      register: retired_login
+      changed_when: false
+
+    - name: Assert the retired app can no longer log in
+      ansible.builtin.assert:
+        that: retired_login.stdout == 'f'
+        fail_msg: "rolcanlogin of app_retired is '{{ retired_login.stdout }}'"
+
+    - name: Read pg_hba.conf
+      ansible.builtin.slurp:
+        src: /etc/postgresql/18/main/pg_hba.conf
+      register: pg_hba_content
+
+    - name: Assert the app block holds the present apps only
+      ansible.builtin.assert:
+        that:
+          - "('host\tapp_one\tapp_one\t' ~ app_address ~ '/32\tscram-sha-256') in pg_hba_lines"
+          - "('host\tapp_two_db\tapp_two\t' ~ app_address ~ '/32\tscram-sha-256') in pg_hba_lines"
+          - pg_hba_lines | select('search', 'app_retired') | list | length == 0
+        fail_msg: "pg_hba.conf does not hold the expected app lines"
+      vars:
+        pg_hba_lines: "{{ (pg_hba_content.content | b64decode).splitlines() }}"
+
+    - name: Assert the postgresql role's block is intact
+      ansible.builtin.assert:
+        that:
+          - "'# BEGIN ANSIBLE MANAGED BLOCK — specsnl.specsops.postgresql\n' in pg_hba_text"
+          - "'host\tlegacy\tlegacy\t192.0.2.0/24\tscram-sha-256' in pg_hba_text"
+          - "'# BEGIN ANSIBLE MANAGED BLOCK — specsnl.specsops.postgresql_apps' in pg_hba_text"
+        fail_msg: "pg_hba.conf lost one of the managed blocks"
+      vars:
+        pg_hba_text: "{{ pg_hba_content.content | b64decode }}"
+
+    - name: Include postgresql_apps role with a reserved name
+      block:
+        - name: Include postgresql_apps role
+          ansible.builtin.include_role:
+            name: specsnl.specsops.postgresql_apps
+          vars:
+            postgresql_apps:
+              - name: all
+                password: all-secret
+                allowed_cidr: 10.0.0.0/8
+        - name: Fail because the role did not
+          ansible.builtin.fail:
+            msg: The role accepted an app named after a pg_hba keyword
+      rescue:
+        - name: Assert the role refused the reserved name
+          ansible.builtin.assert:
+            that: "'is invalid' in item_messages"
+            fail_msg: "Unexpected failure: {{ ansible_failed_result.msg }} {{ item_messages }}"
+          vars:
+            item_messages: "{{ ansible_failed_result.results | default([]) | map(attribute='msg', default='') | join(' ') }}"
+
+    # Last, as it leaves a broken line in pg_hba.conf behind.
+    - name: Include postgresql_apps role with an unknown auth method
+      block:
+        - name: Include postgresql_apps role
+          ansible.builtin.include_role:
+            name: specsnl.specsops.postgresql_apps
+          vars:
+            postgresql_apps:
+              - name: app_one
+                password: "{{ molecule_app_passwords.app_one }}"
+                allowed_cidr: "{{ molecule_app_cidr }}"
+                auth_method: no-such-method
+        - name: Run the handlers
+          ansible.builtin.meta: flush_handlers
+        - name: Fail because the role did not
+          ansible.builtin.fail:
+            msg: The role accepted a pg_hba.conf that does not parse
+      rescue:
+        - name: Assert the role refused to reload the broken pg_hba.conf
+          ansible.builtin.assert:
+            that:
+              - "'has errors, so it was not' in ansible_failed_result.msg"
+              - "'no-such-method' in ansible_failed_result.msg"
+            fail_msg: "Unexpected failure: {{ ansible_failed_result.msg }}"
+
+    - name: Connect app_one to its database over TCP after the refused change
+      ansible.builtin.command:
+        argv:
+          - psql
+          - "host={{ app_address }} dbname=app_one user=app_one"
+          - -tAc
+          - SELECT 1
+      environment:
+        PGPASSWORD: "{{ molecule_app_passwords.app_one }}"
+      changed_when: false

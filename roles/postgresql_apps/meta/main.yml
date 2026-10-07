@@ -1,0 +1,19 @@
+---
+galaxy_info:
+  role_name: postgresql_apps
+  namespace: specsnl
+  author: Ilyes Ahidar
+  description: Per-app PostgreSQL login role, owned database and pg_hba entry
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - resolute
+  galaxy_tags:
+    - ubuntu
+    - resolute
+    - postgresql
+    - database
+    - postgres
+dependencies: []

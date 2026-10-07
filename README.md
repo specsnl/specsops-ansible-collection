@@ -12,6 +12,7 @@ Ubuntu 26.04 (Resolute) hosts at Specs.
 | `specsnl.specsops.firewall`            | ufw baseline + parameterized extra rules                    | [roles/firewall](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/firewall/README.md)                       |
 | `specsnl.specsops.unattended_upgrades` | chrony + unattended-upgrades + apt config                   | [roles/unattended_upgrades](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/unattended_upgrades/README.md) |
 | `specsnl.specsops.postgresql`          | PGDG repo, PostgreSQL install, tuning, `pg_hba`, ufw port   | [roles/postgresql](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/postgresql/README.md)                   |
+| `specsnl.specsops.postgresql_apps`     | per-app login role, owned database and `pg_hba` line        | [roles/postgresql_apps](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/postgresql_apps/README.md)         |
 | `specsnl.specsops.swap`                | swap file create/format/persist/activate + sysctl           | [roles/swap](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/swap/README.md)                               |
 | `specsnl.specsops.logrotate`           | global logrotate maxsize + compression                      | [roles/logrotate](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/logrotate/README.md)                     |
 | `specsnl.specsops.cleanup`             | apt autoremove/clean, wipe temp dirs (build-time)           | [roles/cleanup](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/cleanup/README.md)                         |
@@ -33,7 +34,7 @@ unchanged in a Packer build container, in Molecule, and on a live VM.
 
 - Ansible Core >= 2.16
 - Ubuntu 26.04 LTS (Resolute Raccoon)
-- Collections: `community.general`, `ansible.posix` (installed automatically via Galaxy)
+- Collections: `community.general`, `ansible.posix`, `community.postgresql` (installed automatically via Galaxy)
 
 ## Installation
 
