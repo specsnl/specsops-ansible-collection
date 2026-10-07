@@ -23,6 +23,7 @@ jobs:
       firewall: ${{ steps.filter.outputs.firewall }}
       unattended_upgrades: ${{ steps.filter.outputs.unattended_upgrades }}
       postgresql: ${{ steps.filter.outputs.postgresql }}
+      postgresql_apps: ${{ steps.filter.outputs.postgresql_apps }}
       swap: ${{ steps.filter.outputs.swap }}
       logrotate: ${{ steps.filter.outputs.logrotate }}
       cleanup: ${{ steps.filter.outputs.cleanup }}
@@ -55,6 +56,8 @@ jobs:
               - "roles/unattended_upgrades/**"
             postgresql:
               - "roles/postgresql/**"
+            postgresql_apps:
+              - "roles/postgresql_apps/**"
             swap:
               - "roles/swap/**"
             logrotate:
@@ -108,6 +111,8 @@ jobs:
             run: ${{ needs.changes.outputs.unattended_upgrades }}
           - role: postgresql
             run: ${{ needs.changes.outputs.postgresql }}
+          - role: postgresql_apps
+            run: ${{ needs.changes.outputs.postgresql_apps }}
           - role: swap
             run: ${{ needs.changes.outputs.swap }}
           - role: logrotate
