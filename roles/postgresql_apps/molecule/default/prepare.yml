@@ -1,0 +1,40 @@
+---
+- name: Prepare
+  hosts: all
+  become: true
+  tasks:
+    # The postgresql role's own block must survive the converge.
+    - name: Include postgresql role
+      ansible.builtin.include_role:
+        name: specsnl.specsops.postgresql
+      vars:
+        # Molecule's container runs systemd, so let the role start the server.
+        postgresql_in_container: false
+        postgresql_listen_addresses: "*"
+        postgresql_manage_firewall: false
+        postgresql_hba_entries:
+          - type: host
+            database: legacy
+            user: legacy
+            address: 192.0.2.0/24
+            method: scram-sha-256
+
+    # Stands in for an app a previous run created, now marked absent.
+    - name: Create the retired app's role and database
+      ansible.builtin.command:
+        argv:
+          - psql
+          - -v
+          - ON_ERROR_STOP=1
+          - -c
+          - CREATE ROLE app_retired LOGIN PASSWORD 'app-retired-secret'
+          - -c
+          - CREATE DATABASE app_retired OWNER app_retired
+      become_user: postgres
+      changed_when: true
+
+    - name: Seed the retired app's pg_hba line
+      ansible.builtin.blockinfile:
+        path: /etc/postgresql/18/main/pg_hba.conf
+        marker: "# {mark} ANSIBLE MANAGED BLOCK — specsnl.specsops.postgresql_apps"
+        block: "host\tapp_retired\tapp_retired\t{{ molecule_app_cidr }}\tscram-sha-256"

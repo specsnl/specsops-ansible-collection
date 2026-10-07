@@ -1,0 +1,55 @@
+---
+argument_specs:
+  main:
+    short_description: Per-app PostgreSQL login role, owned database and pg_hba entry
+    description: >-
+      Gives each app on a local PostgreSQL server its own login role and a database
+      owned by it, revokes CONNECT on that database from PUBLIC, and allows the role
+      into its database from the app network only, through a pg_hba.conf marker block
+      of its own. Removing an app disables its login and its pg_hba line; its database
+      is never dropped.
+    options:
+      postgresql_apps:
+        type: list
+        elements: dict
+        default: []
+        description: >-
+          The apps. name and database must be lowercase identifiers, may not start
+          with pg_, and may not be a pg_hba keyword, postgres, public or a template
+          database. Every entry needs its own name and its own database.
+        options:
+          name:
+            type: str
+            required: true
+            description: Login role of the app, and owner of its database.
+          password:
+            type: str
+            no_log: true
+            description: >-
+              Password of the login role. Required when state is present. The role
+              does no secret lookups, so pass it in from the playbook.
+          database:
+            type: str
+            description: Database of the app. Defaults to name.
+          allowed_cidr:
+            type: str
+            description: >-
+              Network the app connects from, e.g. 10.20.0.16/28. Required when state is
+              present.
+          auth_method:
+            type: str
+            default: scram-sha-256
+            description: pg_hba.conf authentication method of the app's line.
+          state:
+            type: str
+            choices: [present, absent]
+            default: present
+            description: >-
+              absent removes the pg_hba line and sets NOLOGIN on the role. The role and
+              its database are kept, and open connections are not terminated.
+      postgresql_apps_port:
+        type: int
+        default: 5432
+        description: >-
+          Port of the local server. The role connects as postgres over the Unix
+          socket, whose file name carries the port.

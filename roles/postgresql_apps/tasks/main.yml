@@ -1,0 +1,125 @@
+---
+- name: Assert the app entries are valid
+  ansible.builtin.assert:
+    that:
+      - item.name is match(postgresql_apps_identifier_regexp)
+      - item.database is match(postgresql_apps_identifier_regexp)
+      - item.name is not match('pg_')
+      - item.database is not match('pg_')
+      - item.name not in postgresql_apps_reserved_names
+      - item.database not in postgresql_apps_reserved_names
+      - item.state == 'absent' or item.has_password
+      - item.state == 'absent' or item.allowed_cidr | length > 0
+    fail_msg: >-
+      postgresql_apps entry '{{ item.name }}' is invalid. name and database must be
+      lowercase identifiers, not starting with pg_ and not one of
+      {{ postgresql_apps_reserved_names | join(', ') }}. A present app also needs a
+      password and an allowed_cidr.
+    quiet: true
+  loop: "{{ postgresql_apps_entries }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Assert app names and databases are unique
+  ansible.builtin.assert:
+    that:
+      - postgresql_apps_entries | map(attribute='name') | unique | length == postgresql_apps_entries | length
+      - postgresql_apps_entries | map(attribute='database') | unique | length == postgresql_apps_entries | length
+    fail_msg: Every postgresql_apps entry needs its own name and its own database.
+    quiet: true
+
+- name: Install psycopg2
+  ansible.builtin.apt:
+    name: python3-psycopg2
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Manage the app login roles
+  community.postgresql.postgresql_user:
+    name: "{{ item.name }}"
+    password: "{{ item.password }}"
+    role_attr_flags: LOGIN
+    login_port: "{{ postgresql_apps_port }}"
+  loop: "{{ postgresql_apps }}"
+  when: (item.state | default('present', true)) == 'present'
+  become: true
+  become_user: postgres
+  no_log: true
+
+- name: Create the app databases
+  community.postgresql.postgresql_db:
+    name: "{{ item.database }}"
+    owner: "{{ item.name }}"
+    state: present
+    login_port: "{{ postgresql_apps_port }}"
+  loop: "{{ postgresql_apps_present }}"
+  loop_control:
+    label: "{{ item.database }}"
+  become: true
+  become_user: postgres
+
+# The owner keeps CONNECT through its implicit privileges, so this shuts out
+# every other app's role.
+- name: Revoke CONNECT on the app databases from PUBLIC
+  community.postgresql.postgresql_privs:
+    login_db: postgres
+    type: database
+    objs: "{{ item.database }}"
+    privs: CONNECT
+    roles: PUBLIC
+    state: absent
+    login_port: "{{ postgresql_apps_port }}"
+  loop: "{{ postgresql_apps_present }}"
+  loop_control:
+    label: "{{ item.database }}"
+  become: true
+  become_user: postgres
+
+- name: List the existing roles
+  community.postgresql.postgresql_query:
+    query: SELECT rolname FROM pg_roles
+    login_port: "{{ postgresql_apps_port }}"
+  register: postgresql_apps_roles
+  changed_when: false
+  become: true
+  become_user: postgres
+  when: postgresql_apps_absent | length > 0
+
+# Only existing roles, as postgresql_user would create a missing one.
+- name: Disable login for removed apps
+  community.postgresql.postgresql_user:
+    name: "{{ item.name }}"
+    role_attr_flags: NOLOGIN
+    login_port: "{{ postgresql_apps_port }}"
+  loop: "{{ postgresql_apps_absent }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.name in (postgresql_apps_roles.query_result | map(attribute='rolname') | list)
+  become: true
+  become_user: postgres
+
+- name: Find pg_hba.conf
+  community.postgresql.postgresql_query:
+    query: SHOW hba_file
+    login_port: "{{ postgresql_apps_port }}"
+  register: postgresql_apps_hba_file
+  changed_when: false
+  become: true
+  become_user: postgres
+
+# Its own marker block, so the postgresql role's block and the distribution's
+# rules are left as they are. Absent apps are simply not rendered.
+- name: Manage the app pg_hba entries
+  ansible.builtin.blockinfile:
+    path: "{{ postgresql_apps_hba_file.query_result[0].hba_file }}"
+    marker: "{{ postgresql_apps_hba_marker }}"
+    state: "{{ 'present' if postgresql_apps_present | length > 0 else 'absent' }}"
+    block: |
+      {% for app in postgresql_apps_present %}
+      host	{{ app.database }}	{{ app.name }}	{{ app.allowed_cidr }}	{{ app.auth_method }}
+      {% endfor %}
+    owner: postgres
+    group: postgres
+    mode: "0640"
+  notify: postgresql_apps pg_hba changed
