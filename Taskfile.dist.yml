@@ -20,6 +20,7 @@ vars:
     - specsdeployd
     - ansible_pull
     - cloud_init_user
+    - block_volume
 
 silent: true
 
