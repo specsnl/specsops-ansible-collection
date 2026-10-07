@@ -8,8 +8,9 @@ authors:
 description: >-
   Ansible roles for provisioning and hardening Specs Ubuntu 26.04 hosts:
   base system, hardening, firewall, unattended upgrades, swap, log rotation,
-  PostgreSQL, Podman, Caddy, the specsdeployd deploy receiver, ansible-pull
-  and a cloud-init default login user for images.
+  PostgreSQL, Podman, Caddy, the specsdeployd deploy receiver, ansible-pull,
+  a cloud-init default login user for images, and block storage volumes
+  mounted by label.
 license:
   - MIT
 tags:
@@ -22,7 +23,6 @@ tags:
   - firewall
   - swap
   - logrotate
-  - logging
   - infrastructure
   - linux
   - security
@@ -33,6 +33,7 @@ tags:
   - webserver
   - deployment
   - cloudinit
+  - storage
 dependencies:
   community.general: ">=8.0.0,<14.0.0"
   ansible.posix: ">=1.5.0,<3.0.0"

@@ -20,6 +20,7 @@ Ubuntu 26.04 (Resolute) hosts at Specs.
 | `specsnl.specsops.specsdeployd`        | deploy receiver scaffolding; binary install is opt-in       | [roles/specsdeployd](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/specsdeployd/README.md)               |
 | `specsnl.specsops.ansible_pull`        | ansible-pull service + timer, disabled and inert by default | [roles/ansible_pull](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/ansible_pull/README.md)               |
 | `specsnl.specsops.cloud_init_user`     | cloud-init default user: non-root sudo login for images     | [roles/cloud_init_user](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/cloud_init_user/README.md)         |
+| `specsnl.specsops.block_volume`        | UpCloud block volume: format only if empty, mount by label  | [roles/block_volume](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/block_volume/README.md)               |
 
 Every role documents its variables in its own README; [docs/README.md](https://github.com/specsnl/specsops-ansible-collection/blob/main/docs/README.md)
 carries the condensed index and the notes on container safety.
