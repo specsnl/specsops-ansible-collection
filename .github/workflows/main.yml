@@ -48,6 +48,7 @@ jobs:
           - specsdeployd
           - ansible_pull
           - cloud_init_user
+          - block_volume
     steps:
       - uses: actions/checkout@v7
       - name: Install collection deps

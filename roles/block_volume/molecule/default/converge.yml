@@ -1,0 +1,24 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  tasks:
+    - name: Include block_volume role
+      ansible.builtin.include_role:
+        name: specsnl.specsops.block_volume
+      vars:
+        block_volume_devices:
+          - storage_uuid: 01d4fcd4-e446-433b-8a9c-551a1284952e
+            label: pgdata
+            mount_point: /srv/pgdata
+            owner: root
+            group: root
+            mode: "0750"
+            required_by:
+              - postgresql@18-main
+              - block-volume-test.service
+          - storage_uuid: 0125a2b1-55f6-4c5e-9a0e-6f0f2b1c4d7a
+            label: scratch
+            fstype: xfs
+            mount_point: /srv/scratch
+            mount_opts: defaults

@@ -1,0 +1,19 @@
+---
+galaxy_info:
+  role_name: block_volume
+  namespace: specsnl
+  author: Ilyes Ahidar
+  description: Block storage volumes — find by UpCloud storage UUID, format only when empty, mount by label
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - resolute
+  galaxy_tags:
+    - ubuntu
+    - resolute
+    - storage
+    - filesystem
+    - upcloud
+dependencies: []

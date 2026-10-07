@@ -1,0 +1,56 @@
+---
+# stat, not a fileglob lookup: lookups run on the controller, which is itself a
+# container here, and would mark every target — real VMs included — as one.
+- name: Stat container marker files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: block_volume_container_markers
+  loop:
+    - /.dockerenv
+    - /run/.containerenv
+  when: block_volume_in_container is not defined
+
+- name: Detect container environment
+  ansible.builtin.set_fact:
+    block_volume_in_container: >-
+      {{ (ansible_facts['virtualization_type'] | default('') in
+          ['docker', 'container', 'containerd', 'podman', 'lxc'])
+         or (block_volume_container_markers.results
+             | selectattr('stat.exists') | list | length > 0) }}
+  when: block_volume_in_container is not defined
+
+- name: Validate block volume entries
+  ansible.builtin.assert:
+    that:
+      - (item.storage_uuid | replace('-', '')) is match('^[0-9a-fA-F]{20,}$')
+      - item.label is match('^[A-Za-z0-9_-]+$')
+      - item.label | length <= (12 if (item.fstype | default(block_volume_fstype)) == 'xfs' else 16)
+      - item.mount_point is match('^/\S+$')
+    fail_msg: >-
+      {{ item.label }}: storage_uuid must be a storage UUID, the label at most 16
+      letters, digits, '-' or '_' (12 for xfs), and mount_point an absolute path
+      other than / without whitespace.
+    quiet: true
+  loop: "{{ block_volume_devices }}"
+  loop_control:
+    label: "{{ item.label }}"
+
+- name: Validate that labels and mount points are unique
+  ansible.builtin.assert:
+    that:
+      - block_volume_devices | map(attribute='label') | unique | length == block_volume_devices | length
+      - block_volume_devices | map(attribute='mount_point') | unique | length == block_volume_devices | length
+    fail_msg: Every block_volume_devices entry needs its own label and mount_point.
+    quiet: true
+
+- name: Set up block volumes
+  ansible.builtin.include_tasks: volume.yml
+  loop: "{{ block_volume_devices }}"
+  loop_control:
+    loop_var: block_volume_device
+    label: "{{ block_volume_device.label }}"
+
+# Before any role that starts a required_by unit, so systemd already knows the
+# fstab entry and the RequiresMountsFor drop-ins when that unit starts.
+- name: Reload systemd now
+  ansible.builtin.meta: flush_handlers
