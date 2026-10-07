@@ -23,8 +23,10 @@ serial holds at most 20 bytes, so udev links the disk as
 
 | Storage UUID                           | by-id link                                    |
 |----------------------------------------|-----------------------------------------------|
-| `01d4fcd4-e446-433b-8a9c-551a1284952e` | `/dev/disk/by-id/virtio-01d4fcd4e446433b8a9c` |
+| `01456089-b1c4-4d5e-9708-4e1c9e0dbb39` | `/dev/disk/by-id/virtio-01456089b1c44d5e9708` |
 
+That pair was checked on an Ubuntu 26.04 VM in `nl-ams1`: the storage at `virtio:0`
+showed up with that link, and `/sys/block/vda/serial` held the same 20 characters.
 UpCloud's CSI driver finds volumes the same way (`volumeIDToDiskID` in
 [UpCloudLtd/upcloud-csi](https://github.com/UpCloudLtd/upcloud-csi)). The link only
 exists for a disk on the `virtio` bus, which is UpCloud's default. When the link is

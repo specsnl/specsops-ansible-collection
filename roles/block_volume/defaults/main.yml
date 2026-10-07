@@ -11,11 +11,13 @@
 # UpCloud passes the storage UUID to the guest as the virtio-blk serial. virtio-blk
 # serials are capped at 20 bytes, so udev links the disk as
 # /dev/disk/by-id/virtio-<first 20 characters of the UUID without dashes>:
-#   storage_uuid 01d4fcd4-e446-433b-8a9c-551a1284952e
-#   by-id link   /dev/disk/by-id/virtio-01d4fcd4e446433b8a9c
-# This is the mapping UpCloud's own CSI driver relies on (volumeIDToDiskID in
-# UpCloudLtd/upcloud-csi). It needs the disk on the virtio bus, which is UpCloud's
-# default; a disk attached as ide or scsi has no such link and the role fails.
+#   storage_uuid 01456089-b1c4-4d5e-9708-4e1c9e0dbb39
+#   by-id link   /dev/disk/by-id/virtio-01456089b1c44d5e9708
+# Checked on an Ubuntu 26.04 VM in nl-ams1, where /sys/block/vda/serial held the
+# same 20 characters. UpCloud's own CSI driver relies on this mapping too
+# (volumeIDToDiskID in UpCloudLtd/upcloud-csi). It needs the disk on the virtio bus,
+# which is UpCloud's default; a disk attached as ide or scsi has no such link and the
+# role fails.
 block_volume_devices: []
 
 block_volume_fstype: ext4
