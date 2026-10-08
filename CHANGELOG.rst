@@ -1,8 +1,23 @@
 =======================================================
-specsnl.specsops Collection Changelog 0.4 Release Notes
+specsnl.specsops Collection Changelog 0.5 Release Notes
 =======================================================
 
 .. contents:: Topics
+
+v0.5.0
+======
+
+Release Summary
+---------------
+
+Feature release with two new roles. ``block_volume`` mounts UpCloud block storage volumes by label, so a VM rebuilt from an image mounts the same data again. ``postgresql_apps`` gives each app on a local PostgreSQL server its own login role, database and ``pg_hba.conf`` line. The collection now depends on ``community.postgresql``.
+
+Minor Changes
+-------------
+
+- The collection now depends on ``community.postgresql`` (``>=4.0.0,<6.0.0``), used by the ``postgresql_apps`` role.
+- block_volume - new role that mounts UpCloud block storage volumes, so a VM rebuilt from an image mounts the same data again. Each entry in ``block_volume_devices`` names a ``storage_uuid``, ``label`` and ``mount_point``. The disk is found at ``/dev/disk/by-id/virtio-<first 20 characters of the UUID without dashes>``, and the role fails when it is not attached. A filesystem (``ext4`` by default) is created only when the disk has none, through ``community.general.filesystem`` with ``force: false``, and an existing filesystem without a label gets one. The role refuses a partitioned disk, a filesystem of another type, another label, and a label that a second disk also carries. The volume is mounted as ``LABEL=<label>`` without ``nofail``, so a missing volume stops the boot rather than letting services write to the OS disk. Units in ``required_by`` get a ``RequiresMountsFor`` drop-in. In containers only the fstab entry and the drop-ins are written.
+- postgresql_apps - new role that gives each app on a local PostgreSQL server its own login role, a database owned by it, and a ``pg_hba.conf`` line that admits only that role, to only that database, from only ``allowed_cidr``. ``CONNECT`` on the database is revoked from ``PUBLIC``, so other apps' roles cannot connect either. The lines go in their own marker block, ``specsnl.specsops.postgresql_apps``, leaving the ``postgresql`` role's block alone, and the server is reloaded, not restarted, after ``pg_hba_file_rules`` is checked for errors. ``state: absent`` removes the line and sets ``NOLOGIN``, but never drops the database. Passwords are passed in; the role does no secret lookups.
 
 v0.4.0
 ======
