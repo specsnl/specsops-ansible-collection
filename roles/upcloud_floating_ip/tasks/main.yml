@@ -1,0 +1,133 @@
+---
+# stat, not a fileglob lookup: lookups run on the controller, which is itself a
+# container here, and would mark every target — real VMs included — as one.
+- name: Stat container marker files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: upcloud_floating_ip_container_markers
+  loop:
+    - /.dockerenv
+    - /run/.containerenv
+  when: upcloud_floating_ip_in_container is not defined
+
+- name: Detect container environment
+  ansible.builtin.set_fact:
+    upcloud_floating_ip_in_container: >-
+      {{ (ansible_facts['virtualization_type'] | default('') in
+          ['docker', 'container', 'containerd', 'podman', 'lxc'])
+         or (upcloud_floating_ip_container_markers.results
+             | selectattr('stat.exists') | list | length > 0) }}
+  when: upcloud_floating_ip_in_container is not defined
+
+- name: Validate the floating IPs
+  ansible.builtin.assert:
+    that: upcloud_floating_ip_invalid | length == 0
+    fail_msg: >-
+      {{ upcloud_floating_ip_invalid | join(', ') }}: upcloud_floating_ip_addresses
+      takes IPv4 addresses without a prefix length.
+    quiet: true
+  vars:
+    upcloud_floating_ip_invalid: >-
+      {{ upcloud_floating_ip_addresses
+         | reject('match', '^((25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])$')
+         | list }}
+
+# Read even when the addresses are given: only the metadata knows which MAC
+# address the floating IPs are routed to.
+- name: Read the UpCloud metadata
+  ansible.builtin.uri:
+    url: "{{ upcloud_floating_ip_metadata_url }}"
+    return_content: true
+    use_proxy: false
+    timeout: 10
+  register: upcloud_floating_ip_metadata
+
+# UpCloud gives public IPv4 and public IPv6 their own interface by default; the
+# floating IPs sit on the IPv4 one.
+- name: Find the public IPv4 interface in the metadata
+  ansible.builtin.set_fact:
+    upcloud_floating_ip_public: >-
+      {%- set ns = namespace(found=[]) -%}
+      {%- for iface in (upcloud_floating_ip_metadata.content | from_json).network.interfaces
+            if iface.type == 'public'
+               and iface.ip_addresses | selectattr('family', 'equalto', 'IPv4') | list -%}
+        {%- set ns.found = ns.found + [iface] -%}
+      {%- endfor -%}
+      {{ ns.found }}
+
+- name: Fail without exactly one public IPv4 interface
+  ansible.builtin.fail:
+    msg: >-
+      The metadata at {{ upcloud_floating_ip_metadata_url }} lists
+      {{ upcloud_floating_ip_public | length }} public interfaces with an IPv4 address,
+      so the floating IPs have no single interface to go on.
+  when: upcloud_floating_ip_public | length != 1
+
+- name: Gather network facts
+  ansible.builtin.setup:
+    gather_subset:
+      - network
+  when: ansible_facts['interfaces'] is not defined
+
+- name: Set facts for the public interface
+  ansible.builtin.set_fact:
+    upcloud_floating_ip_mac: "{{ upcloud_floating_ip_public[0].mac | lower }}"
+    upcloud_floating_ip_wanted: >-
+      {{ (upcloud_floating_ip_addresses
+          or (upcloud_floating_ip_public[0].ip_addresses
+              | selectattr('family', 'equalto', 'IPv4')
+              | selectattr('floating', 'defined') | selectattr('floating')
+              | map(attribute='address') | list))
+         | unique | list }}
+
+# By MAC address, not by name: names depend on the image and the attach order.
+- name: Find the interface with the public MAC address
+  ansible.builtin.set_fact:
+    upcloud_floating_ip_devices: >-
+      {{ ansible_facts | dict2items
+         | selectattr('value.device', 'defined')
+         | selectattr('value.macaddress', 'defined')
+         | selectattr('value.macaddress', 'equalto', upcloud_floating_ip_mac)
+         | map(attribute='value.device') | unique | list }}
+
+- name: Fail without exactly one interface with the public MAC address
+  ansible.builtin.fail:
+    msg: >-
+      {{ upcloud_floating_ip_devices | length }} interfaces carry the public MAC address
+      {{ upcloud_floating_ip_mac }}{{ ': ' ~ upcloud_floating_ip_devices | join(', ') if upcloud_floating_ip_devices }}.
+      Expected exactly one.
+  when: upcloud_floating_ip_devices | length != 1
+
+- name: Ensure the netplan directory exists
+  ansible.builtin.file:
+    path: "{{ upcloud_floating_ip_netplan_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: upcloud_floating_ip_wanted | length > 0
+
+# Keyed by the interface name, as cloud-init keys its own definition, so netplan
+# merges the addresses into it instead of seeing two definitions of one interface.
+# Mode 0600: netplan warns about drop-ins that others can read.
+- name: Hold the floating IPs on {{ upcloud_floating_ip_devices[0] }}
+  ansible.builtin.template:
+    src: netplan.yaml.j2
+    dest: "{{ upcloud_floating_ip_netplan_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  when: upcloud_floating_ip_wanted | length > 0
+  notify: Apply netplan
+
+# What the old server does after its IP moved to a replacement.
+- name: Remove the drop-in without floating IPs
+  ansible.builtin.file:
+    path: "{{ upcloud_floating_ip_netplan_path }}"
+    state: absent
+  when: upcloud_floating_ip_wanted | length == 0
+  notify: Apply netplan
+
+# Before any role that binds to a floating IP.
+- name: Apply netplan now
+  ansible.builtin.meta: flush_handlers
