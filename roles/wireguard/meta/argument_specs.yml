@@ -1,0 +1,76 @@
+---
+argument_specs:
+  main:
+    short_description: WireGuard admin hub
+    description: >-
+      Installs wireguard-tools, templates the interface config with the given key and
+      peers, and enables wg-quick. Optionally forwards and masquerades the tunnel to
+      private networks behind the host, and opens the port and route rules in ufw.
+    options:
+      wireguard_interface:
+        type: str
+        default: wg0
+        description: Interface name; the config is /etc/wireguard/<interface>.conf.
+      wireguard_address:
+        type: str
+        required: true
+        description: >-
+          This host's tunnel address with the tunnel network's prefix length, e.g.
+          10.21.0.1/24. IPv4 only.
+      wireguard_listen_port:
+        type: int
+        default: 51820
+        description: UDP port the interface listens on.
+      wireguard_private_key:
+        type: str
+        required: true
+        no_log: true
+        description: >-
+          This host's private key, as printed by wg genkey. Passed in rather than
+          generated, so a replacement host keeps the identity the peers' configs
+          point at.
+      wireguard_peers:
+        type: list
+        elements: dict
+        default: []
+        description: >-
+          Peers allowed to connect. When only this list changes, the peers are applied
+          with wg syncconf instead of restarting the interface.
+        options:
+          name:
+            type: str
+            required: true
+            description: Written as a comment above the peer's section.
+          public_key:
+            type: str
+            required: true
+            description: The peer's public key.
+          allowed_ips:
+            type: list
+            elements: str
+            required: true
+            description: >-
+              The peer's tunnel address, e.g. 10.21.0.2/32. Traffic from the peer with
+              another source address is dropped.
+      wireguard_forward_cidrs:
+        type: list
+        elements: str
+        default: []
+        description: >-
+          IPv4 networks behind this host that peers may reach. Any entry enables
+          net.ipv4.ip_forward through a sysctl drop-in. Give network addresses, as ufw
+          normalises the rest.
+      wireguard_masquerade:
+        type: bool
+        default: true
+        description: >-
+          Adds a PostUp/PostDown MASQUERADE rule per forward network, so the targets
+          see this host's address instead of the peer's.
+      wireguard_manage_firewall:
+        type: bool
+        default: true
+        description: >-
+          When true, opens wireguard_listen_port/udp and adds a route rule in on the
+          interface to each forward network. Rules this role added for an old port or
+          a dropped network are removed. Skipped in containers, and when ufw is not
+          installed, which logs a warning instead of failing.

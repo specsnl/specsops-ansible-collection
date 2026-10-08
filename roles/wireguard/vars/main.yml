@@ -1,0 +1,13 @@
+---
+wireguard_config_file: "/etc/wireguard/{{ wireguard_interface }}.conf"
+wireguard_service: "wg-quick@{{ wireguard_interface }}"
+wireguard_sysctl_file: /etc/sysctl.d/99-wireguard.conf
+wireguard_ipv4_cidr_regexp: '^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$'
+
+wireguard_firewall_comment: specsnl.specsops.wireguard
+# Match this role's lines in `ufw show added`. Groups: the port; the interface
+# and the destination network.
+wireguard_firewall_port_regexp: >-
+  ^ufw allow (\d+)/udp comment '{{ wireguard_firewall_comment | regex_escape }}'$
+wireguard_firewall_route_regexp: >-
+  ^ufw route allow in on (\S+) to (\S+) comment '{{ wireguard_firewall_comment | regex_escape }}'$

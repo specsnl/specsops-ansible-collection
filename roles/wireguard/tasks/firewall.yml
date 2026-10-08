@@ -1,0 +1,100 @@
+---
+# This role does not depend on the firewall role, so ufw may simply not be here.
+- name: Check whether ufw is installed
+  ansible.builtin.stat:
+    path: /usr/sbin/ufw
+  register: wireguard_ufw
+  when: wireguard_manage_firewall | bool
+
+- name: Warn that the WireGuard port was left closed
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: ufw is not installed, so {{ wireguard_listen_port }}/udp was not opened
+      and no route rules were added for {{ wireguard_interface }}. Run the
+      specsnl.specsops.firewall role first, or set wireguard_manage_firewall to false
+      and manage the rules yourself.
+  when:
+    - wireguard_manage_firewall | bool
+    - not wireguard_ufw.stat.exists
+
+# A changed port or a network dropped from wireguard_forward_cidrs would otherwise
+# leave its rule active. Only rules carrying this role's comment are considered,
+# so rules added by hand or by the firewall role are left alone.
+- name: Read the added ufw rules
+  ansible.builtin.command: ufw show added
+  register: wireguard_ufw_added
+  changed_when: false
+  when:
+    - wireguard_manage_firewall | bool
+    - wireguard_ufw.stat.exists
+
+- name: Find stale WireGuard firewall rules
+  ansible.builtin.set_fact:
+    wireguard_firewall_stale_ports: >-
+      {%- set stale = [] -%}
+      {%- for line in wireguard_ufw_added.stdout_lines -%}
+      {%-   set match = line | regex_search(wireguard_firewall_port_regexp, '\\1') -%}
+      {%-   if match and match[0] != wireguard_listen_port | string -%}
+      {%-     set _ = stale.append(match[0]) -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ stale }}
+    wireguard_firewall_stale_routes: >-
+      {%- set stale = [] -%}
+      {%- for line in wireguard_ufw_added.stdout_lines -%}
+      {%-   set match = line | regex_search(wireguard_firewall_route_regexp, '\\1', '\\2') -%}
+      {%-   if match and (match[0] != wireguard_interface or match[1] not in wireguard_forward_cidrs) -%}
+      {%-     set _ = stale.append({'interface': match[0], 'to_ip': match[1]}) -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ stale }}
+  when:
+    - wireguard_manage_firewall | bool
+    - wireguard_ufw.stat.exists
+
+- name: Remove WireGuard port rules for an old port
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: udp
+    delete: true
+  loop: "{{ wireguard_firewall_stale_ports }}"
+  when:
+    - wireguard_manage_firewall | bool
+    - wireguard_ufw.stat.exists
+
+- name: Remove WireGuard route rules for dropped networks
+  community.general.ufw:
+    rule: allow
+    route: true
+    interface_in: "{{ item.interface }}"
+    to_ip: "{{ item.to_ip }}"
+    delete: true
+  loop: "{{ wireguard_firewall_stale_routes }}"
+  when:
+    - wireguard_manage_firewall | bool
+    - wireguard_ufw.stat.exists
+
+- name: Allow the WireGuard port through the firewall
+  community.general.ufw:
+    rule: allow
+    port: "{{ wireguard_listen_port | string }}"
+    proto: udp
+    comment: "{{ wireguard_firewall_comment }}"
+  when:
+    - wireguard_manage_firewall | bool
+    - wireguard_ufw.stat.exists
+
+# ufw drops forwarded traffic by default, so every network peers may reach
+# needs its own route rule.
+- name: Route the tunnel to each forward network
+  community.general.ufw:
+    rule: allow
+    route: true
+    interface_in: "{{ wireguard_interface }}"
+    to_ip: "{{ item }}"
+    comment: "{{ wireguard_firewall_comment }}"
+  loop: "{{ wireguard_forward_cidrs }}"
+  when:
+    - wireguard_manage_firewall | bool
+    - wireguard_ufw.stat.exists
