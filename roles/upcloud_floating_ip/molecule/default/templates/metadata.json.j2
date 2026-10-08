@@ -1,0 +1,77 @@
+{
+  "cloud_name": "upcloud",
+  "hostname": "app-1",
+  "instance_id": "00c3d1f0-5b0e-4b1e-8f3a-6d1f2e9a7c41",
+  "platform": "servers",
+  "region": "nl-ams1",
+  "network": {
+    "dns": ["94.237.127.9", "94.237.40.9"],
+    "interfaces": [
+      {
+        "index": 1,
+        "ip_addresses": [
+          {
+            "address": "203.0.113.20",
+            "dhcp": true,
+            "dns": ["94.237.127.9", "94.237.40.9"],
+            "family": "IPv4",
+            "floating": false,
+            "gateway": "203.0.113.1",
+            "network": "203.0.113.0/24"
+          }{% for address in item.floating %},
+          {
+            "address": "{{ address }}",
+            "dhcp": false,
+            "dns": null,
+            "family": "IPv4",
+            "floating": true,
+            "gateway": "",
+            "network": "{{ address }}/32"
+          }{% endfor %}
+
+        ],
+        "mac": "{{ item.mac }}",
+        "network_id": "03000000-0000-4000-8045-000000000000",
+        "type": "public"
+      },
+      {
+        "index": 2,
+        "ip_addresses": [
+          {
+            "address": "10.6.0.15",
+            "dhcp": true,
+            "dns": null,
+            "family": "IPv4",
+            "floating": false,
+            "gateway": "10.6.0.1",
+            "network": "10.6.0.0/22"
+          }
+        ],
+        "mac": "02:00:00:00:00:02",
+        "network_id": "03000000-0000-4000-8046-000000000000",
+        "type": "utility"
+      },
+      {
+        "index": 3,
+        "ip_addresses": [
+          {
+            "address": "2001:db8::20",
+            "dhcp": true,
+            "dns": null,
+            "family": "IPv6",
+            "floating": false,
+            "gateway": "2001:db8::1",
+            "network": "2001:db8::/64"
+          }
+        ],
+        "mac": "02:00:00:00:00:03",
+        "network_id": "03000000-0000-4000-8047-000000000000",
+        "type": "public"
+      }
+    ]
+  },
+  "public_keys": [],
+  "tags": [],
+  "user_data": "",
+  "vendor_data": ""
+}

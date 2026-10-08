@@ -1,0 +1,8 @@
+---
+# IPv4 floating IPs to hold on the public interface. When empty, the role takes the
+# addresses that the UpCloud metadata service lists as floating on that interface,
+# and removes the drop-in when there are none.
+upcloud_floating_ip_addresses: []
+
+upcloud_floating_ip_netplan_path: /etc/netplan/60-upcloud-floating-ip.yaml
+upcloud_floating_ip_metadata_url: http://169.254.169.254/metadata/v1.json

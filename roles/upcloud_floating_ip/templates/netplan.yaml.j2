@@ -1,0 +1,11 @@
+# Managed by Ansible — specsnl.specsops.upcloud_floating_ip
+network:
+  version: 2
+  ethernets:
+    {{ upcloud_floating_ip_devices[0] }}:
+      match:
+        macaddress: "{{ upcloud_floating_ip_mac }}"
+      addresses:
+{% for address in upcloud_floating_ip_wanted %}
+        - "{{ address }}/32"
+{% endfor %}
