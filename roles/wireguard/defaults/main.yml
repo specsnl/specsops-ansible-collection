@@ -1,0 +1,22 @@
+---
+wireguard_interface: wg0
+wireguard_listen_port: 51820
+
+# wireguard_address (e.g. 10.21.0.1/24) and wireguard_private_key have no default.
+# The key is passed in rather than generated on the host, so a replacement host
+# keeps the identity every peer's config points at.
+
+# Each entry: name, public_key, and allowed_ips (the peer's tunnel address,
+# e.g. 10.21.0.2/32).
+wireguard_peers: []
+
+# Networks behind this host that peers may reach. Any entry turns on IPv4
+# forwarding.
+wireguard_forward_cidrs: []
+
+# Rewrites the source of forwarded traffic to this host's address, so the
+# targets need no route back to the tunnel network.
+wireguard_masquerade: true
+
+# Opens wireguard_listen_port/udp and routes the tunnel to each forward CIDR.
+wireguard_manage_firewall: true

@@ -1,0 +1,218 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  vars:
+    wireguard_address: 10.21.0.1/24
+    wireguard_private_key: 6lzJRo9ZI/49cHdRQR4BWbbFCTnjp2TWOSrR4Ch41Ls=
+    wireguard_peers:
+      - name: alice-laptop
+        public_key: WWfFdZVUeKCzhWJJvzYlS/FNpbuysv6MuJr2yQdNSaw=
+        allowed_ips:
+          - 10.21.0.2/32
+      - name: bob-laptop
+        public_key: KC3Av1VINtPCixTLrCyDrtszeMcAwVvPOhj4YtxXnV0=
+        allowed_ips:
+          - 10.21.0.3/32
+    wireguard_forward_cidrs:
+      - 10.20.0.0/24
+      - 10.30.0.16/28
+  tasks:
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+        manager: apt
+
+    - name: Assert wireguard-tools and iptables are installed
+      ansible.builtin.assert:
+        that:
+          - "'wireguard-tools' in ansible_facts.packages"
+          - "'iptables' in ansible_facts.packages"
+        fail_msg: "wireguard-tools or iptables is not installed"
+
+    - name: Stat /etc/wireguard
+      ansible.builtin.stat:
+        path: /etc/wireguard
+      register: wireguard_dir
+
+    - name: Stat the WireGuard config
+      ansible.builtin.stat:
+        path: /etc/wireguard/wg0.conf
+      register: wireguard_conf
+
+    - name: Assert the config is readable by root only
+      ansible.builtin.assert:
+        that:
+          - wireguard_dir.stat.mode == '0700'
+          - wireguard_conf.stat.exists
+          - wireguard_conf.stat.mode == '0600'
+          - wireguard_conf.stat.pw_name == 'root'
+          - wireguard_conf.stat.gr_name == 'root'
+        fail_msg: "/etc/wireguard or wg0.conf is not root-owned with mode 0700/0600"
+
+    - name: Read the WireGuard config
+      ansible.builtin.slurp:
+        src: /etc/wireguard/wg0.conf
+      register: wireguard_conf_content
+
+    - name: Assert the config holds the interface, the masquerade rules and the peers
+      vars:
+        lines: "{{ (wireguard_conf_content.content | b64decode).splitlines() }}"
+      ansible.builtin.assert:
+        that:
+          - "'Address = 10.21.0.1/24' in lines"
+          - "'ListenPort = 51820' in lines"
+          - "'PrivateKey = 6lzJRo9ZI/49cHdRQR4BWbbFCTnjp2TWOSrR4Ch41Ls=' in lines"
+          - "'PostUp = iptables -t nat -A POSTROUTING -s 10.21.0.1/24 -d 10.20.0.0/24 -j MASQUERADE' in lines"
+          - "'PostDown = iptables -t nat -D POSTROUTING -s 10.21.0.1/24 -d 10.20.0.0/24 -j MASQUERADE' in lines"
+          - "'PostUp = iptables -t nat -A POSTROUTING -s 10.21.0.1/24 -d 10.30.0.16/28 -j MASQUERADE' in lines"
+          - "'PostDown = iptables -t nat -D POSTROUTING -s 10.21.0.1/24 -d 10.30.0.16/28 -j MASQUERADE' in lines"
+          - lines | select('eq', '[Peer]') | list | length == 2
+          - "'# alice-laptop' in lines"
+          - "'PublicKey = WWfFdZVUeKCzhWJJvzYlS/FNpbuysv6MuJr2yQdNSaw=' in lines"
+          - "'AllowedIPs = 10.21.0.2/32' in lines"
+          - "'# bob-laptop' in lines"
+          - "'PublicKey = KC3Av1VINtPCixTLrCyDrtszeMcAwVvPOhj4YtxXnV0=' in lines"
+          - "'AllowedIPs = 10.21.0.3/32' in lines"
+        fail_msg: "wg0.conf does not match the expected configuration"
+
+    # What the syncconf handler feeds to wg, so it must parse.
+    - name: Strip the config the way wg syncconf reads it
+      ansible.builtin.command: wg-quick strip wg0
+      register: wireguard_stripped
+      changed_when: false
+
+    - name: Assert the stripped config keeps the key and peers but no wg-quick settings
+      ansible.builtin.assert:
+        that:
+          - "'PrivateKey = ' in wireguard_stripped.stdout"
+          - wireguard_stripped.stdout_lines | select('eq', '[Peer]') | list | length == 2
+          - "'PostUp' not in wireguard_stripped.stdout"
+          - "'Address' not in wireguard_stripped.stdout"
+        fail_msg: "wg-quick strip did not produce the expected config"
+
+    - name: Check whether wg-quick@wg0 is enabled
+      ansible.builtin.command: systemctl is-enabled wg-quick@wg0
+      register: wireguard_enabled
+      changed_when: false
+
+    - name: Assert wg-quick@wg0 is enabled
+      ansible.builtin.assert:
+        that: wireguard_enabled.stdout == 'enabled'
+        fail_msg: "wg-quick@wg0 is not enabled"
+
+    - name: Read the forwarding drop-in
+      ansible.builtin.slurp:
+        src: /etc/sysctl.d/99-wireguard.conf
+      register: wireguard_sysctl_content
+
+    - name: Assert IPv4 forwarding is enabled in the drop-in
+      ansible.builtin.assert:
+        that: (wireguard_sysctl_content.content | b64decode) is search('(?m)^net\.ipv4\.ip_forward\s*=\s*1$')
+        fail_msg: "/etc/sysctl.d/99-wireguard.conf does not enable net.ipv4.ip_forward"
+
+    - name: Check ufw added rules
+      ansible.builtin.command: ufw show added
+      register: ufw_added_rules
+      changed_when: false
+
+    - name: Assert the port and a route rule per forward network are open
+      ansible.builtin.assert:
+        that:
+          - >-
+            "ufw allow 51820/udp comment 'specsnl.specsops.wireguard'"
+            in ufw_added_rules.stdout_lines
+          - >-
+            "ufw route allow in on wg0 to 10.20.0.0/24 comment 'specsnl.specsops.wireguard'"
+            in ufw_added_rules.stdout_lines
+          - >-
+            "ufw route allow in on wg0 to 10.30.0.16/28 comment 'specsnl.specsops.wireguard'"
+            in ufw_added_rules.stdout_lines
+        fail_msg: "ufw is missing the WireGuard port or a route rule"
+
+    - name: Assert stale rules are gone and foreign rules kept
+      ansible.builtin.assert:
+        that:
+          - "'51821' not in ufw_added_rules.stdout"
+          - "'10.99.0.0/24' not in ufw_added_rules.stdout"
+          - "'ufw route allow in on wg0 to 10.98.0.0/24' in ufw_added_rules.stdout_lines"
+        fail_msg: "ufw rules were not pruned as expected"
+
+    # The checks below change the configuration, so they run last.
+    - name: Add a peer
+      ansible.builtin.include_role:
+        name: specsnl.specsops.wireguard
+      vars:
+        wireguard_peers:
+          - name: alice-laptop
+            public_key: WWfFdZVUeKCzhWJJvzYlS/FNpbuysv6MuJr2yQdNSaw=
+            allowed_ips: 10.21.0.2/32
+          - name: carol-laptop
+            public_key: n5XTtuRqXt+DItm9PQh0mfjP0RBCOJFMHljWBqYza5k=
+            allowed_ips:
+              - 10.21.0.4/32
+
+    - name: Assert a peer change syncs instead of restarting
+      ansible.builtin.assert:
+        that:
+          - wireguard_config.changed
+          - not wireguard_restart
+        fail_msg: "Changing only the peers would restart the interface"
+
+    - name: Drop a forward network
+      ansible.builtin.include_role:
+        name: specsnl.specsops.wireguard
+      vars:
+        wireguard_forward_cidrs:
+          - 10.20.0.0/24
+
+    - name: Assert an interface change restarts
+      ansible.builtin.assert:
+        that:
+          - wireguard_config.changed
+          - wireguard_restart
+        fail_msg: "Changing the masquerade rules would not restart the interface"
+
+    - name: Drop the forward network's firewall rule
+      ansible.builtin.include_role:
+        name: specsnl.specsops.wireguard
+        tasks_from: firewall
+      vars:
+        wireguard_forward_cidrs:
+          - 10.20.0.0/24
+
+    - name: Check ufw added rules after dropping a forward network
+      ansible.builtin.command: ufw show added
+      register: ufw_added_rules
+      changed_when: false
+
+    - name: Assert the dropped network's route rule is gone
+      ansible.builtin.assert:
+        that:
+          - "'10.30.0.16/28' not in ufw_added_rules.stdout"
+          - >-
+            "ufw route allow in on wg0 to 10.20.0.0/24 comment 'specsnl.specsops.wireguard'"
+            in ufw_added_rules.stdout_lines
+        fail_msg: "The route rule for a dropped forward network was not removed"
+
+    - name: Stop forwarding
+      ansible.builtin.include_role:
+        name: specsnl.specsops.wireguard
+      vars:
+        wireguard_forward_cidrs: []
+
+    - name: Stat the forwarding drop-in
+      ansible.builtin.stat:
+        path: /etc/sysctl.d/99-wireguard.conf
+      register: wireguard_sysctl
+
+    - name: Read the WireGuard config without forwarding
+      ansible.builtin.slurp:
+        src: /etc/wireguard/wg0.conf
+      register: wireguard_conf_content
+
+    - name: Assert forwarding and masquerading are gone
+      ansible.builtin.assert:
+        that:
+          - not wireguard_sysctl.stat.exists
+          - "'PostUp' not in (wireguard_conf_content.content | b64decode)"
+        fail_msg: "Forwarding or masquerading is still configured with no forward networks"

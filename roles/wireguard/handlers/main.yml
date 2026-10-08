@@ -1,0 +1,21 @@
+---
+- name: Restart wireguard
+  ansible.builtin.systemd_service:
+    name: "{{ wireguard_service }}"
+    state: restarted
+  when:
+    - not wireguard_in_container
+    - wireguard_restart | bool
+  listen: wireguard config changed
+
+# wg syncconf adds, updates and removes peers in place, without taking the
+# interface down.
+- name: Sync wireguard peers
+  ansible.builtin.shell:
+    cmd: wg syncconf {{ wireguard_interface | quote }} <(wg-quick strip {{ wireguard_interface | quote }})
+    executable: /bin/bash
+  changed_when: true
+  when:
+    - not wireguard_in_container
+    - not (wireguard_restart | bool)
+  listen: wireguard config changed

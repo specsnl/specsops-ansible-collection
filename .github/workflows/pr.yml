@@ -33,6 +33,7 @@ jobs:
       ansible_pull: ${{ steps.filter.outputs.ansible_pull }}
       cloud_init_user: ${{ steps.filter.outputs.cloud_init_user }}
       block_volume: ${{ steps.filter.outputs.block_volume }}
+      wireguard: ${{ steps.filter.outputs.wireguard }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -76,6 +77,8 @@ jobs:
               - "roles/cloud_init_user/**"
             block_volume:
               - "roles/block_volume/**"
+            wireguard:
+              - "roles/wireguard/**"
 
   lint:
     name: Lint
@@ -131,6 +134,8 @@ jobs:
             run: ${{ needs.changes.outputs.cloud_init_user }}
           - role: block_volume
             run: ${{ needs.changes.outputs.block_volume }}
+          - role: wireguard
+            run: ${{ needs.changes.outputs.wireguard }}
     steps:
       - uses: actions/checkout@v7
         if: ${{ matrix.run == 'true' }}

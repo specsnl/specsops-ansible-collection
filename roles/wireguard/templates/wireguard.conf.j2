@@ -1,0 +1,18 @@
+# Managed by Ansible — specsnl.specsops.wireguard
+[Interface]
+Address = {{ wireguard_address }}
+ListenPort = {{ wireguard_listen_port }}
+PrivateKey = {{ wireguard_private_key }}
+{% if wireguard_masquerade %}
+{% for cidr in wireguard_forward_cidrs %}
+PostUp = iptables -t nat -A POSTROUTING -s {{ wireguard_address }} -d {{ cidr }} -j MASQUERADE
+PostDown = iptables -t nat -D POSTROUTING -s {{ wireguard_address }} -d {{ cidr }} -j MASQUERADE
+{% endfor %}
+{% endif %}
+{% for peer in wireguard_peers %}
+
+[Peer]
+# {{ peer.name }}
+PublicKey = {{ peer.public_key }}
+AllowedIPs = {{ [peer.allowed_ips] | flatten | join(', ') }}
+{% endfor %}

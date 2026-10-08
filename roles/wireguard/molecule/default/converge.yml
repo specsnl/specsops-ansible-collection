@@ -1,0 +1,31 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  vars:
+    wireguard_address: 10.21.0.1/24
+    # Throwaway test key, not used anywhere else.
+    wireguard_private_key: 6lzJRo9ZI/49cHdRQR4BWbbFCTnjp2TWOSrR4Ch41Ls=
+    wireguard_peers:
+      - name: alice-laptop
+        public_key: WWfFdZVUeKCzhWJJvzYlS/FNpbuysv6MuJr2yQdNSaw=
+        allowed_ips:
+          - 10.21.0.2/32
+      - name: bob-laptop
+        public_key: KC3Av1VINtPCixTLrCyDrtszeMcAwVvPOhj4YtxXnV0=
+        allowed_ips:
+          - 10.21.0.3/32
+    wireguard_forward_cidrs:
+      - 10.20.0.0/24
+      - 10.30.0.16/28
+  tasks:
+    - name: Include wireguard role
+      ansible.builtin.include_role:
+        name: specsnl.specsops.wireguard
+
+    # The role skips the firewall in containers, and ufw show added works
+    # without enabling ufw, so the firewall tasks are run on their own as on a VM.
+    - name: Include wireguard firewall tasks
+      ansible.builtin.include_role:
+        name: specsnl.specsops.wireguard
+        tasks_from: firewall
