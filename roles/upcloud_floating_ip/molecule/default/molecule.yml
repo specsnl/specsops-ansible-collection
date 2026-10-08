@@ -1,0 +1,62 @@
+---
+dependency:
+  name: galaxy
+  options:
+    requirements-file: ../../../../requirements.yml
+
+driver:
+  name: docker
+
+platforms:
+  - name: ubuntu2604
+    image: geerlingguy/docker-ubuntu2604-ansible@sha256:1aa37801b2496b234dc46f1965b4499ebfaf06ad3c585006bd0a5f326a71abe3
+    pre_build_image: true
+    command: /usr/lib/systemd/systemd
+    privileged: true
+    cgroupns_mode: host
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    tmpfs:
+      - /run
+      - /tmp
+    capabilities:
+      - SYS_ADMIN
+
+provisioner:
+  name: ansible
+  config_options:
+    defaults:
+      pipelining: true
+  inventory:
+    group_vars:
+      all:
+        # prepare.yml serves its fixture metadata here, in place of 169.254.169.254.
+        molecule_metadata_base: http://127.0.0.1:8169/metadata
+        upcloud_floating_ip_metadata_url: "{{ molecule_metadata_base }}/v1.json"
+
+verifier:
+  name: ansible
+
+scenario:
+  test_sequence:
+    # - dependency  # handled by Taskfile before molecule runs
+    # - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - idempotence
+    # - side_effect
+    - verify
+    # - cleanup
+    - destroy
+  converge_sequence:
+    # - dependency  # handled by Taskfile before molecule runs
+    - create
+    - prepare
+    - converge
+  destroy_sequence:
+    # - dependency  # handled by Taskfile before molecule runs
+    # - cleanup
+    - destroy

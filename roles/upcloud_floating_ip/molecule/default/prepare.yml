@@ -1,0 +1,48 @@
+---
+# Serves fixture copies of http://169.254.169.254/metadata/v1.json, shaped like
+# the UpCloud default of separate public IPv4, utility and public IPv6 interfaces:
+#   v1.json           two floating IPs on this container's eth0
+#   moved.json        the same server after its floating IP moved away
+#   foreign-mac.json  a public interface whose MAC is not on this host
+- name: Prepare
+  hosts: all
+  become: true
+  vars:
+    molecule_public_mac: "{{ ansible_facts['default_ipv4']['macaddress'] | upper }}"
+    molecule_fixtures:
+      - name: v1.json
+        mac: "{{ molecule_public_mac }}"
+        floating: [192.0.2.10, 192.0.2.11]
+      - name: moved.json
+        mac: "{{ molecule_public_mac }}"
+        floating: []
+      - name: foreign-mac.json
+        mac: "02:00:00:00:00:99"
+        floating: [192.0.2.10]
+  tasks:
+    - name: Create the fixture directory
+      ansible.builtin.file:
+        path: /srv/upcloud-metadata/metadata
+        state: directory
+        mode: "0755"
+
+    - name: Write the fixture metadata
+      ansible.builtin.template:
+        src: metadata.json.j2
+        dest: "/srv/upcloud-metadata/metadata/{{ item.name }}"
+        mode: "0644"
+      loop: "{{ molecule_fixtures }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Serve the fixture metadata
+      ansible.builtin.command: >-
+        systemd-run --unit=upcloud-metadata-fixture
+        python3 -m http.server 8169 --bind 127.0.0.1 --directory /srv/upcloud-metadata
+      changed_when: true
+
+    - name: Wait for the fixture metadata
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 8169
+        timeout: 30

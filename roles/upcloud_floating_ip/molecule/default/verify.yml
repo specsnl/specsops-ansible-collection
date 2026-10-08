@@ -1,0 +1,114 @@
+---
+# netplan is not run in a container, so this scenario proves the rendered drop-in
+# and that the container's network is left alone. That netplan merges the drop-in
+# and moves the address has to be verified on a real VM — see the role README.
+- name: Verify
+  hosts: all
+  become: true
+  vars:
+    molecule_dropin: /etc/netplan/60-upcloud-floating-ip.yaml
+    molecule_interface: "{{ ansible_facts['default_ipv4']['interface'] }}"
+    molecule_mac: "{{ ansible_facts['default_ipv4']['macaddress'] }}"
+  tasks:
+    - name: Stat the drop-in
+      ansible.builtin.stat:
+        path: "{{ molecule_dropin }}"
+      register: molecule_dropin_stat
+
+    - name: Assert the drop-in is readable by root only
+      ansible.builtin.assert:
+        that:
+          - molecule_dropin_stat.stat.exists
+          - molecule_dropin_stat.stat.mode == '0600'
+          - molecule_dropin_stat.stat.pw_name == 'root'
+        fail_msg: "{{ molecule_dropin }} is missing or not 0600 root"
+
+    - name: Read the drop-in
+      ansible.builtin.slurp:
+        src: "{{ molecule_dropin }}"
+      register: molecule_dropin_content
+
+    - name: Assert the metadata's floating IPs are on the interface with its MAC
+      ansible.builtin.assert:
+        that:
+          - molecule_netplan.network.version == 2
+          - molecule_netplan.network.ethernets | list == [molecule_interface]
+          - molecule_netplan.network.ethernets[molecule_interface].match | list == ['macaddress']
+          - molecule_netplan.network.ethernets[molecule_interface].match.macaddress == molecule_mac
+          - molecule_netplan.network.ethernets[molecule_interface].addresses == ['192.0.2.10/32', '192.0.2.11/32']
+        fail_msg: "Unexpected drop-in: {{ molecule_netplan }}"
+      vars:
+        molecule_netplan: "{{ molecule_dropin_content.content | b64decode | from_yaml }}"
+
+    - name: Assert the container's addresses were left alone
+      ansible.builtin.assert:
+        that: "'192.0.2.10' not in ansible_facts['all_ipv4_addresses']"
+        fail_msg: netplan was applied inside the container
+
+    - name: Include upcloud_floating_ip role with addresses given
+      ansible.builtin.include_role:
+        name: specsnl.specsops.upcloud_floating_ip
+      vars:
+        upcloud_floating_ip_addresses:
+          - 198.51.100.7
+
+    - name: Read the drop-in with addresses given
+      ansible.builtin.slurp:
+        src: "{{ molecule_dropin }}"
+      register: molecule_dropin_given
+
+    - name: Assert the given address replaced the metadata's
+      ansible.builtin.assert:
+        that: (molecule_dropin_given.content | b64decode | from_yaml).network.ethernets[molecule_interface].addresses == ['198.51.100.7/32']
+        fail_msg: "Unexpected drop-in: {{ molecule_dropin_given.content | b64decode }}"
+
+    - name: Include upcloud_floating_ip role after the IP moved away
+      ansible.builtin.include_role:
+        name: specsnl.specsops.upcloud_floating_ip
+      vars:
+        upcloud_floating_ip_metadata_url: "{{ molecule_metadata_base }}/moved.json"
+
+    - name: Stat the drop-in after the IP moved away
+      ansible.builtin.stat:
+        path: "{{ molecule_dropin }}"
+      register: molecule_dropin_moved
+
+    - name: Assert the drop-in is gone
+      ansible.builtin.assert:
+        that: not molecule_dropin_moved.stat.exists
+        fail_msg: "{{ molecule_dropin }} is still there without a floating IP"
+
+    - name: Run the role with the public MAC address on no interface
+      block:
+        - name: Include upcloud_floating_ip role with a foreign MAC address
+          ansible.builtin.include_role:
+            name: specsnl.specsops.upcloud_floating_ip
+          vars:
+            upcloud_floating_ip_metadata_url: "{{ molecule_metadata_base }}/foreign-mac.json"
+
+        - name: Fail when the role did not fail
+          ansible.builtin.fail:
+            msg: The role did not fail for a MAC address that is not on this host
+      rescue:
+        - name: Assert the role names the MAC address
+          ansible.builtin.assert:
+            that: "'0 interfaces carry the public MAC address 02:00:00:00:00:99' in ansible_failed_result.msg"
+            fail_msg: "Unexpected failure: {{ ansible_failed_result.msg | default(ansible_failed_result) }}"
+
+    - name: Run the role with an address that has a prefix length
+      block:
+        - name: Include upcloud_floating_ip role with 198.51.100.7/32
+          ansible.builtin.include_role:
+            name: specsnl.specsops.upcloud_floating_ip
+          vars:
+            upcloud_floating_ip_addresses:
+              - 198.51.100.7/32
+
+        - name: Fail when the role did not fail
+          ansible.builtin.fail:
+            msg: The role accepted an address with a prefix length
+      rescue:
+        - name: Assert the role rejects the address
+          ansible.builtin.assert:
+            that: "'198.51.100.7/32: upcloud_floating_ip_addresses takes IPv4 addresses' in ansible_failed_result.msg"
+            fail_msg: "Unexpected failure: {{ ansible_failed_result.msg | default(ansible_failed_result) }}"

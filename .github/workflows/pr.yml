@@ -33,6 +33,7 @@ jobs:
       ansible_pull: ${{ steps.filter.outputs.ansible_pull }}
       cloud_init_user: ${{ steps.filter.outputs.cloud_init_user }}
       block_volume: ${{ steps.filter.outputs.block_volume }}
+      upcloud_floating_ip: ${{ steps.filter.outputs.upcloud_floating_ip }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -76,6 +77,8 @@ jobs:
               - "roles/cloud_init_user/**"
             block_volume:
               - "roles/block_volume/**"
+            upcloud_floating_ip:
+              - "roles/upcloud_floating_ip/**"
 
   lint:
     name: Lint
@@ -131,6 +134,8 @@ jobs:
             run: ${{ needs.changes.outputs.cloud_init_user }}
           - role: block_volume
             run: ${{ needs.changes.outputs.block_volume }}
+          - role: upcloud_floating_ip
+            run: ${{ needs.changes.outputs.upcloud_floating_ip }}
     steps:
       - uses: actions/checkout@v7
         if: ${{ matrix.run == 'true' }}

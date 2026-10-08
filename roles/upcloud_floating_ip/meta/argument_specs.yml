@@ -1,0 +1,29 @@
+---
+argument_specs:
+  main:
+    short_description: UpCloud floating IP on the public interface
+    description: >-
+      Finds the public interface by the MAC address that the UpCloud metadata service
+      gives for it, and adds each floating IP to it as a /32 through a netplan drop-in.
+      Without floating IPs the drop-in is removed, which is what the old server does
+      after its IP moved. In containers the drop-in is written but netplan is not run.
+    options:
+      upcloud_floating_ip_addresses:
+        type: list
+        elements: str
+        default: []
+        description: >-
+          IPv4 floating IPs to hold, without a prefix length. When empty, the addresses
+          the metadata service lists as floating on the public interface are used.
+      upcloud_floating_ip_netplan_path:
+        type: path
+        default: /etc/netplan/60-upcloud-floating-ip.yaml
+        description: >-
+          Netplan drop-in to write, with mode 0600. It must sort after the file that
+          configures the public interface, such as cloud-init's 50-cloud-init.yaml.
+      upcloud_floating_ip_metadata_url:
+        type: str
+        default: http://169.254.169.254/metadata/v1.json
+        description: >-
+          UpCloud metadata service, read on the host itself. The server needs Metadata
+          enabled. Only overridden to serve a fixture in tests.
