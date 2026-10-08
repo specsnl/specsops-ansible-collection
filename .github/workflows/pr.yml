@@ -34,6 +34,7 @@ jobs:
       cloud_init_user: ${{ steps.filter.outputs.cloud_init_user }}
       block_volume: ${{ steps.filter.outputs.block_volume }}
       wireguard: ${{ steps.filter.outputs.wireguard }}
+      upcloud_floating_ip: ${{ steps.filter.outputs.upcloud_floating_ip }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -79,6 +80,8 @@ jobs:
               - "roles/block_volume/**"
             wireguard:
               - "roles/wireguard/**"
+            upcloud_floating_ip:
+              - "roles/upcloud_floating_ip/**"
 
   lint:
     name: Lint
@@ -136,6 +139,8 @@ jobs:
             run: ${{ needs.changes.outputs.block_volume }}
           - role: wireguard
             run: ${{ needs.changes.outputs.wireguard }}
+          - role: upcloud_floating_ip
+            run: ${{ needs.changes.outputs.upcloud_floating_ip }}
     steps:
       - uses: actions/checkout@v7
         if: ${{ matrix.run == 'true' }}
