@@ -1,8 +1,27 @@
 =======================================================
-specsnl.specsops Collection Changelog 0.5 Release Notes
+specsnl.specsops Collection Changelog 0.6 Release Notes
 =======================================================
 
 .. contents:: Topics
+
+v0.6.0
+======
+
+Release Summary
+---------------
+
+Feature release with two new roles. ``wireguard`` makes the host a WireGuard hub for admin access, and ``upcloud_floating_ip`` holds UpCloud floating IPs on the server they are assigned to. ``postgresql_apps`` no longer prints warnings on a run.
+
+Bugfixes
+--------
+
+- postgresql_apps - no more warnings on a run. The ``postgresql_query`` tasks and handlers connect to the ``postgres`` database explicitly, and the role creates the ``postgres`` user's ``~/.ansible/tmp`` before its first module runs as that user.
+
+Minor Changes
+-------------
+
+- upcloud_floating_ip - new role that holds UpCloud floating IPs on the server they are assigned to, so moving the IP to a replacement server needs no DNS change. It reads the UpCloud metadata service, takes the public interface with an IPv4 address, and finds it on the host by MAC address rather than by name. Each floating IP, from the metadata's ``floating`` entries or from ``upcloud_floating_ip_addresses``, is added as a ``/32`` through a ``0600`` netplan drop-in, ``/etc/netplan/60-upcloud-floating-ip.yaml`` by default, which a handler applies with ``netplan generate`` and then ``netplan apply``. Without floating IPs the drop-in is removed and netplan applied again, which is what the old server does after its IP moved. In containers the drop-in is written but netplan is not run.
+- wireguard - new role that makes the host a WireGuard hub for admin access. It installs ``wireguard-tools``, writes ``/etc/wireguard/<wireguard_interface>.conf`` as ``0600`` root from ``wireguard_address``, ``wireguard_listen_port``, ``wireguard_private_key`` and ``wireguard_peers``, and enables ``wg-quick@<wireguard_interface>``. The private key is passed in, not generated, so a replacement host keeps its identity. When only the peers change they are applied with ``wg syncconf`` instead of a restart, so the admin's own session over the tunnel survives. ``wireguard_forward_cidrs`` enables ``net.ipv4.ip_forward`` through ``/etc/sysctl.d/99-wireguard.conf`` and, with ``wireguard_masquerade``, adds a ``PostUp``/``PostDown`` MASQUERADE rule per network. With ``wireguard_manage_firewall`` the role opens the port and a ``route allow in on`` rule per network in ufw itself, tagged ``specsnl.specsops.wireguard`` so stale ones are removed. In containers the interface is not started.
 
 v0.5.0
 ======
