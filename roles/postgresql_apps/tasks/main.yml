@@ -35,6 +35,16 @@
     update_cache: true
     cache_valid_time: 3600
 
+# Modules run as postgres create their remote_tmp under its home on first use
+# and warn about the 0700 mode.
+- name: Create the postgres user's Ansible remote_tmp
+  ansible.builtin.file:
+    path: ~postgres/.ansible/tmp
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0700"
+
 - name: Manage the app login roles
   community.postgresql.postgresql_user:
     name: "{{ item.name }}"
@@ -78,6 +88,7 @@
 
 - name: List the existing roles
   community.postgresql.postgresql_query:
+    login_db: postgres
     query: SELECT rolname FROM pg_roles
     login_port: "{{ postgresql_apps_port }}"
   register: postgresql_apps_roles
@@ -101,6 +112,7 @@
 
 - name: Find pg_hba.conf
   community.postgresql.postgresql_query:
+    login_db: postgres
     query: SHOW hba_file
     login_port: "{{ postgresql_apps_port }}"
   register: postgresql_apps_hba_file

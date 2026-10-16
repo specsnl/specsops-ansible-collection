@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - >-
+    postgresql_apps - no more warnings on a run. The ``postgresql_query`` tasks and
+    handlers connect to the ``postgres`` database explicitly, and the role creates the
+    ``postgres`` user's ``~/.ansible/tmp`` before its first module runs as that user.

@@ -4,6 +4,7 @@
 # order, so a bad file fails the play before the reload.
 - name: Check pg_hba.conf for errors
   community.postgresql.postgresql_query:
+    login_db: postgres
     query: SELECT line_number, error FROM pg_hba_file_rules WHERE error IS NOT NULL
     login_port: "{{ postgresql_apps_port }}"
   register: postgresql_apps_hba_errors
@@ -24,6 +25,7 @@
 # A reload is enough for pg_hba.conf and leaves open connections alone.
 - name: Reload postgresql for postgresql_apps
   community.postgresql.postgresql_query:
+    login_db: postgres
     query: SELECT pg_reload_conf()
     login_port: "{{ postgresql_apps_port }}"
   become: true
