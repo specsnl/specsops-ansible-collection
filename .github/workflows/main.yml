@@ -51,6 +51,7 @@ jobs:
           - cloud_init_user
           - block_volume
           - wireguard
+          - upcloud_floating_ip
     steps:
       - uses: actions/checkout@v7
       - name: Install collection deps

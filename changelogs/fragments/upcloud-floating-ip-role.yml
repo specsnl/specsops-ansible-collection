@@ -1,0 +1,18 @@
+---
+minor_changes:
+  - >-
+    upcloud_floating_ip - new role that holds UpCloud floating IPs on the server they are
+    assigned to, so moving the IP to a replacement server needs no DNS change. It reads
+    the UpCloud metadata service, takes the public interface with an IPv4 address, and
+    finds it on the host by MAC address rather than by name. Each floating IP, from the
+    metadata's ``floating`` entries or from ``upcloud_floating_ip_addresses``, is added
+    as a ``/32`` through a ``0600`` netplan drop-in,
+    ``/etc/netplan/60-upcloud-floating-ip.yaml`` by default, which a handler applies with
+    ``netplan generate`` and then ``netplan apply``. Without floating IPs the drop-in is
+    removed and netplan applied again, which is what the old server does after its IP
+    moved. In containers the drop-in is written but netplan is not run.
+
+trivial:
+  - >-
+    CI - ``upcloud_floating_ip`` is wired into the Molecule matrices of ``pr.yml`` and
+    ``main.yml`` and into the Taskfile ``ROLES`` fan-out.

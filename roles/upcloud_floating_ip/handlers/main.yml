@@ -1,0 +1,14 @@
+---
+# generate first, so a drop-in netplan rejects fails the play before apply
+# touches the live interfaces.
+- name: Generate netplan config
+  ansible.builtin.command: netplan generate
+  changed_when: true
+  when: not (upcloud_floating_ip_in_container | bool)
+  listen: Apply netplan
+
+- name: Apply netplan config
+  ansible.builtin.command: netplan apply
+  changed_when: true
+  when: not (upcloud_floating_ip_in_container | bool)
+  listen: Apply netplan

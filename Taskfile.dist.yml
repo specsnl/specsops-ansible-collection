@@ -23,6 +23,7 @@ vars:
     - cloud_init_user
     - block_volume
     - wireguard
+    - upcloud_floating_ip
 
 silent: true
 

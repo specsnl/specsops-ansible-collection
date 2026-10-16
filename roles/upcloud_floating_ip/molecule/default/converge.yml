@@ -1,0 +1,8 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  tasks:
+    - name: Include upcloud_floating_ip role
+      ansible.builtin.include_role:
+        name: specsnl.specsops.upcloud_floating_ip
