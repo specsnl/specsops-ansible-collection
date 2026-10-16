@@ -1,0 +1,106 @@
+---
+# stat, not a fileglob lookup: lookups run on the controller, which is itself a
+# container here, and would mark every target — real VMs included — as one.
+- name: Stat container marker files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: wireguard_container_markers
+  loop:
+    - /.dockerenv
+    - /run/.containerenv
+  when: wireguard_in_container is not defined
+
+- name: Detect container environment
+  ansible.builtin.set_fact:
+    wireguard_in_container: >-
+      {{ (ansible_facts['virtualization_type'] | default('') in
+          ['docker', 'container', 'containerd', 'podman', 'lxc'])
+         or (wireguard_container_markers.results
+             | selectattr('stat.exists') | list | length > 0) }}
+  when: wireguard_in_container is not defined
+
+# The masquerade rules and the ip_forward sysctl only cover IPv4.
+- name: Assert the tunnel address and forward networks are IPv4
+  ansible.builtin.assert:
+    that:
+      - wireguard_address is match(wireguard_ipv4_cidr_regexp)
+      - wireguard_forward_cidrs | reject('match', wireguard_ipv4_cidr_regexp) | list | length == 0
+    fail_msg: >-
+      wireguard_address and every wireguard_forward_cidrs entry must be an IPv4 address
+      with a prefix length, e.g. 10.21.0.1/24.
+    quiet: true
+
+- name: Install WireGuard
+  ansible.builtin.apt:
+    name: "{{ ['wireguard-tools'] + (['iptables'] if wireguard_masquerade and wireguard_forward_cidrs | length > 0 else []) }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure /etc/wireguard exists
+  ansible.builtin.file:
+    path: /etc/wireguard
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Read the current WireGuard config
+  ansible.builtin.slurp:
+    src: "{{ wireguard_config_file }}"
+  register: wireguard_config_before
+  failed_when: false
+  no_log: true
+
+# Address, port, key and the PostUp/PostDown rules only take effect when the
+# interface comes up. Peers alone go through wg syncconf, which keeps the tunnel,
+# and the session of the admin running this play over it, up.
+- name: Decide whether a config change has to restart the interface
+  ansible.builtin.set_fact:
+    wireguard_restart: >-
+      {{ (wireguard_config_before.content | default('') | b64decode
+          | regex_replace('(?ms)^\[Peer\].*', '') | trim)
+         != (lookup('ansible.builtin.template', 'wireguard.conf.j2')
+             | regex_replace('(?ms)^\[Peer\].*', '') | trim) }}
+
+- name: Deploy the WireGuard config
+  ansible.builtin.template:
+    src: wireguard.conf.j2
+    dest: "{{ wireguard_config_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+  register: wireguard_config
+  no_log: true
+  notify: wireguard config changed
+
+# The sysctl is written even in containers so the drop-in is testable; it is only
+# applied live where the kernel is actually ours to tune.
+- name: Enable IPv4 forwarding
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    sysctl_file: "{{ wireguard_sysctl_file }}"
+    reload: "{{ not (wireguard_in_container | bool) }}"
+    sysctl_set: "{{ not (wireguard_in_container | bool) }}"
+    state: present
+  when: wireguard_forward_cidrs | length > 0
+
+# Something else on the host may rely on forwarding, so the live value is left
+# as it is until the next boot.
+- name: Remove the IPv4 forwarding drop-in
+  ansible.builtin.file:
+    path: "{{ wireguard_sysctl_file }}"
+    state: absent
+  when: wireguard_forward_cidrs | length == 0
+
+# A container cannot create the interface, so it is only enabled there.
+- name: Enable the WireGuard interface
+  ansible.builtin.systemd_service:
+    name: "{{ wireguard_service }}"
+    enabled: true
+    state: "{{ 'started' if not wireguard_in_container else omit }}"
+
+- name: Manage WireGuard firewall rules
+  ansible.builtin.include_tasks: firewall.yml
+  when: not (wireguard_in_container | bool)

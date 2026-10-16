@@ -1,0 +1,23 @@
+---
+minor_changes:
+  - >-
+    wireguard - new role that makes the host a WireGuard hub for admin access. It installs
+    ``wireguard-tools``, writes ``/etc/wireguard/<wireguard_interface>.conf`` as ``0600``
+    root from ``wireguard_address``, ``wireguard_listen_port``, ``wireguard_private_key``
+    and ``wireguard_peers``, and enables ``wg-quick@<wireguard_interface>``. The private
+    key is passed in, not generated, so a replacement host keeps its identity. When only
+    the peers change they are applied with ``wg syncconf`` instead of a restart, so the
+    admin's own session over the tunnel survives. ``wireguard_forward_cidrs`` enables
+    ``net.ipv4.ip_forward`` through ``/etc/sysctl.d/99-wireguard.conf`` and, with
+    ``wireguard_masquerade``, adds a ``PostUp``/``PostDown`` MASQUERADE rule per network.
+    With ``wireguard_manage_firewall`` the role opens the port and a ``route allow in on``
+    rule per network in ufw itself, tagged ``specsnl.specsops.wireguard`` so stale ones
+    are removed. In containers the interface is not started.
+
+trivial:
+  - >-
+    CI - ``wireguard`` is wired into the Molecule matrices of ``pr.yml`` and
+    ``main.yml`` and into the Taskfile ``ROLES`` fan-out.
+  - >-
+    galaxy.yml - the ``linux`` tag, which ``ubuntu`` already covers, makes room for
+    ``wireguard``; Galaxy rejects more than 20 tags.

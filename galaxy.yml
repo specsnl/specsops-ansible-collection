@@ -10,7 +10,7 @@ description: >-
   base system, hardening, firewall, unattended upgrades, swap, log rotation,
   PostgreSQL and a per-app PostgreSQL role and database, Podman, Caddy, the
   specsdeployd deploy receiver, ansible-pull, a cloud-init default login user
-  for images, and block storage volumes mounted by label.
+  for images, block storage volumes mounted by label, and a WireGuard admin hub.
 license:
   - MIT
 tags:
@@ -24,7 +24,7 @@ tags:
   - swap
   - logrotate
   - infrastructure
-  - linux
+  - wireguard
   - security
   - database
   - podman

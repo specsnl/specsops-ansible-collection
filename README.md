@@ -22,6 +22,7 @@ Ubuntu 26.04 (Resolute) hosts at Specs.
 | `specsnl.specsops.ansible_pull`        | ansible-pull service + timer, disabled and inert by default | [roles/ansible_pull](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/ansible_pull/README.md)               |
 | `specsnl.specsops.cloud_init_user`     | cloud-init default user: non-root sudo login for images     | [roles/cloud_init_user](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/cloud_init_user/README.md)         |
 | `specsnl.specsops.block_volume`        | UpCloud block volume: format only if empty, mount by label  | [roles/block_volume](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/block_volume/README.md)               |
+| `specsnl.specsops.wireguard`           | WireGuard admin hub: peers, forwarding, masquerade, ufw     | [roles/wireguard](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/wireguard/README.md)                     |
 
 Every role documents its variables in its own README; [docs/README.md](https://github.com/specsnl/specsops-ansible-collection/blob/main/docs/README.md)
 carries the condensed index and the notes on container safety.

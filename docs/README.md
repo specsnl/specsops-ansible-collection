@@ -17,6 +17,7 @@
 | ansible_pull        | `specsnl.specsops.ansible_pull`        | `ansible` package, `/etc/ansible-pull/env`, service + timer. Empty repo is a logged no-op; timer stays disabled unless enabled                                                      |
 | cloud_init_user     | `specsnl.specsops.cloud_init_user`     | `99-zz-` cloud.cfg.d drop-in: `system_info.default_user` `specsops` with sudo and a locked password, `disable_root`, optional `ssh_import_id`                                       |
 | block_volume        | `specsnl.specsops.block_volume`        | disk by UpCloud storage UUID, filesystem only when it has none, mounted by label without `nofail`, `RequiresMountsFor` drop-ins for `required_by` units                             |
+| wireguard           | `specsnl.specsops.wireguard`           | `wireguard-tools`, `0600` interface config from a passed-in key, `wg-quick@` enable, peer-only changes via `wg syncconf`, ip_forward drop-in, MASQUERADE, ufw port and route rules  |
 
 Each role's own README documents its variables in full.
 
