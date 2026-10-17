@@ -1,8 +1,26 @@
 =======================================================
-specsnl.specsops Collection Changelog 0.6 Release Notes
+specsnl.specsops Collection Changelog 0.7 Release Notes
 =======================================================
 
 .. contents:: Topics
+
+v0.7.0
+======
+
+Release Summary
+---------------
+
+Release with a breaking change to ``postgresql``. The role now fails when ``postgresql_data_directory`` would land on the root filesystem, also when a volume failed to mount while its mount point exists on the OS disk. Set ``postgresql_data_directory_require_mount`` to ``false`` to keep the data there. The data directory may now sit more than one level below the mounted volume.
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- postgresql - the role now fails when ``postgresql_data_directory`` would land on the root filesystem, checked with ``findmnt`` on the nearest directory on its path that exists. This also catches a volume that failed to mount while its mount point exists on the OS disk, which the old parent check let through. Set the new ``postgresql_data_directory_require_mount`` to ``false`` to keep the data on the root filesystem at a custom path.
+
+Minor Changes
+-------------
+
+- postgresql - ``postgresql_data_directory`` may now sit more than one level below the mounted volume, such as ``/srv/pgdata/18/main``. The role creates the missing directories between the mount point and the data directory, owned by ``postgres`` with mode ``0755``, instead of failing when the parent does not exist.
 
 v0.6.0
 ======
