@@ -96,8 +96,8 @@ a unit from `required_by` does not delete its drop-in.
 ## Example
 
 A PostgreSQL host with its cluster on a volume. `block_volume` runs before `postgresql`,
-and the data directory is a subdirectory of the mount point, because a fresh ext4
-filesystem holds `lost+found`.
+and the data directory is below the mount point, because a fresh ext4 filesystem holds
+`lost+found`. The `postgresql` role creates the version directory in between.
 
 ```yaml
 - hosts: db
@@ -113,5 +113,5 @@ filesystem holds `lost+found`.
               - postgresql@18-main
     - role: specsnl.specsops.postgresql
       vars:
-        postgresql_data_directory: /srv/pgdata/main
+        postgresql_data_directory: /srv/pgdata/18/main
 ```

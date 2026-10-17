@@ -19,6 +19,8 @@ platforms:
     tmpfs:
       - /run
       - /tmp
+      # Stands in for the mounted volume, so the role's mount check is exercised.
+      - /srv/pgdata
     capabilities:
       - SYS_ADMIN
 

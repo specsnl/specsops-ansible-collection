@@ -7,18 +7,19 @@ enables the service, and optionally opens the port in ufw.
 
 ## Variables
 
-| Variable                      | Default                                              | Description                       |
-|-------------------------------|------------------------------------------------------|-----------------------------------|
-| `postgresql_version`          | `18`                                                 | PostgreSQL major version          |
-| `postgresql_port`             | `5432`                                               | Port                              |
-| `postgresql_pgdg_key_url`     | `https://www.postgresql.org/media/keys/ACCC4CF8.asc` | PGDG signing key URL              |
-| `postgresql_listen_addresses` | `localhost`                                          | `listen_addresses` value          |
-| `postgresql_timezone`         | `UTC`                                                | `timezone` and `log_timezone`     |
-| `postgresql_data_directory`   | `""`                                                 | Data directory (see below)        |
-| `postgresql_manage_firewall`  | `true`                                               | Open port in ufw (see below)      |
-| `postgresql_firewall_sources` | `[]`                                                 | Sources the port is open to       |
-| `postgresql_hba_entries`      | `[]`                                                 | Extra `pg_hba.conf` entries       |
-| `postgresql_tuning`           | see below                                            | Map of postgresql.conf parameters |
+| Variable                                  | Default                                              | Description                       |
+|-------------------------------------------|------------------------------------------------------|-----------------------------------|
+| `postgresql_version`                      | `18`                                                 | PostgreSQL major version          |
+| `postgresql_port`                         | `5432`                                               | Port                              |
+| `postgresql_pgdg_key_url`                 | `https://www.postgresql.org/media/keys/ACCC4CF8.asc` | PGDG signing key URL              |
+| `postgresql_listen_addresses`             | `localhost`                                          | `listen_addresses` value          |
+| `postgresql_timezone`                     | `UTC`                                                | `timezone` and `log_timezone`     |
+| `postgresql_data_directory`               | `""`                                                 | Data directory (see below)        |
+| `postgresql_data_directory_require_mount` | `true`                                               | Refuse the root filesystem        |
+| `postgresql_manage_firewall`              | `true`                                               | Open port in ufw (see below)      |
+| `postgresql_firewall_sources`             | `[]`                                                 | Sources the port is open to       |
+| `postgresql_hba_entries`                  | `[]`                                                 | Extra `pg_hba.conf` entries       |
+| `postgresql_tuning`                       | see below                                            | Map of postgresql.conf parameters |
 
 ## Connection access
 
@@ -77,8 +78,18 @@ can be rebuilt from an image and the data reattached. Empty (the default) leaves
 cluster where it is.
 
 This role does not mount anything. Mount the volume first, for example with the
-`block_volume` role. The parent of the target must exist, or the role fails, so that
-a volume that failed to mount does not get a fresh cluster written to the OS disk.
+`block_volume` role. The role finds the filesystem the target lands on, starting from
+the nearest directory on its path that already exists, and fails when that is the root
+filesystem. That way a volume that failed to mount does not get a fresh cluster written
+to the OS disk. Directories missing between the mount point and the target are created,
+owned by `postgres` with mode `0755` like Debian's `/var/lib/postgresql/<version>`.
+
+Use a versioned path such as `/srv/pgdata/18/main`, with the volume mounted on
+`/srv/pgdata`. On a fresh volume the role creates `/srv/pgdata/18`, and
+`pg_upgradecluster` can later put `19/main` next to it on the same volume.
+
+To keep the data on the root filesystem at a custom path on purpose, set
+`postgresql_data_directory_require_mount: false`.
 
 What happens depends on what the target holds:
 
@@ -99,7 +110,7 @@ directory is left in place. Don't set `data_directory` in `conf.d` as well: it i
 included last and would win.
 
 ```yaml
-postgresql_data_directory: /mnt/pgdata/main
+postgresql_data_directory: /srv/pgdata/18/main
 ```
 
 ## Contrib extensions

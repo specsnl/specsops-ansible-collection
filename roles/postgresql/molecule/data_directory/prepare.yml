@@ -3,13 +3,6 @@
   hosts: all
   become: true
   tasks:
-    # Stands in for the mounted volume.
-    - name: Create the volume directory
-      ansible.builtin.file:
-        path: /srv/pgdata
-        state: directory
-        mode: "0755"
-
     - name: Create directories the role must refuse
       ansible.builtin.file:
         path: "/srv/pgdata/{{ item }}"
