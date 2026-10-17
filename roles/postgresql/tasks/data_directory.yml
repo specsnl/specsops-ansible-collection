@@ -11,24 +11,64 @@
   ansible.builtin.set_fact:
     postgresql_data_directory_path: "{{ postgresql_data_directory | regex_replace('/+$', '') }}"
 
-- name: Stat the data directory's parent
-  ansible.builtin.stat:
-    path: "{{ postgresql_data_directory_path | dirname }}"
-  register: postgresql_data_parent
+# Only the ancestors, from the top down. "/" always exists, so it is left out.
+- name: List the data directory's ancestors
+  ansible.builtin.set_fact:
+    postgresql_data_directory_ancestors: >-
+      {%- set parts = postgresql_data_directory_path.split('/') -%}
+      {%- set ancestors = [] -%}
+      {%- for i in range(2, parts | length) -%}
+      {%-   set _ = ancestors.append(parts[:i] | join('/')) -%}
+      {%- endfor -%}
+      {{ ancestors }}
 
-# Creating a missing parent would silently put the data on the OS disk whenever
-# the volume failed to mount.
-- name: Fail when the data directory's parent is missing
-  ansible.builtin.fail:
-    msg: >-
-      {{ postgresql_data_directory_path | dirname }} does not exist. This role does not
-      mount anything: mount the volume (e.g. with the block_volume role) before running it.
-  when: not (postgresql_data_parent.stat.isdir | default(false))
+- name: Stat the data directory's ancestors
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ postgresql_data_directory_ancestors }}"
+  register: postgresql_data_ancestors
 
 - name: Stat the data directory
   ansible.builtin.stat:
     path: "{{ postgresql_data_directory_path }}"
   register: postgresql_data_dir
+
+# The data directory itself counts, in case the volume is mounted right there.
+- name: Find the nearest existing directory on the data directory's path
+  ansible.builtin.set_fact:
+    postgresql_data_existing_path: >-
+      {{ (postgresql_data_ancestors.results | selectattr('stat.exists') | map(attribute='item') | list
+          + ([postgresql_data_directory_path] if postgresql_data_dir.stat.exists else []))
+         | last | default('/') }}
+
+# findmnt rather than ansible_facts.mounts: facts are gathered before a role such
+# as block_volume mounts the volume.
+- name: Find the filesystem the data directory lands on
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - --noheadings
+      - --output
+      - TARGET
+      - --target
+      - "{{ postgresql_data_existing_path }}"
+  register: postgresql_data_mount
+  changed_when: false
+  check_mode: false
+
+# A volume that failed to mount leaves its mount point on the root filesystem,
+# where a fresh cluster would otherwise be written.
+- name: Fail when the data directory is on the root filesystem
+  ansible.builtin.fail:
+    msg: >-
+      {{ postgresql_data_existing_path }} is on the root filesystem, so
+      {{ postgresql_data_directory_path }} would end up on the OS disk. This role does not
+      mount anything: mount the volume (e.g. with the block_volume role) before running it,
+      or set postgresql_data_directory_require_mount to false to keep the data on the root
+      filesystem.
+  when:
+    - postgresql_data_directory_require_mount | bool
+    - postgresql_data_mount.stdout | trim == '/'
 
 - name: Fail when the data directory is not a directory
   ansible.builtin.fail:
@@ -107,6 +147,18 @@
     name: rsync
     state: present
   when: not postgresql_data_pg_version.stat.exists
+
+# Owned and moded like Debian's /var/lib/postgresql/<version>.
+- name: Create the missing directories above the data directory
+  ansible.builtin.file:
+    path: "{{ item.item }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0755"
+  loop: "{{ postgresql_data_ancestors.results | rejectattr('stat.exists') | list }}"
+  loop_control:
+    label: "{{ item.item }}"
 
 - name: Create the data directory
   ansible.builtin.file:

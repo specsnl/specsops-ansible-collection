@@ -12,7 +12,7 @@
 
     - name: Assert the server runs from the data directory
       ansible.builtin.assert:
-        that: show_data_directory.stdout == '/srv/pgdata/main'
+        that: show_data_directory.stdout == '/srv/pgdata/18/main'
         fail_msg: "SHOW data_directory returned '{{ show_data_directory.stdout }}'"
 
     # pg_ctlcluster has to agree, or it would stop and start the wrong directory.
@@ -24,7 +24,7 @@
 
     - name: Assert postgresql-common sees the data directory
       ansible.builtin.assert:
-        that: "(pg_lsclusters.stdout.split())[5] == '/srv/pgdata/main'"
+        that: "(pg_lsclusters.stdout.split())[5] == '/srv/pgdata/18/main'"
         fail_msg: "pg_lsclusters reports: {{ pg_lsclusters.stdout }}"
 
     - name: Read the marker row
@@ -41,7 +41,7 @@
 
     - name: Stat the data directory
       ansible.builtin.stat:
-        path: /srv/pgdata/main
+        path: /srv/pgdata/18/main
       register: data_dir
 
     - name: Assert the data directory is owned by postgres with mode 0700
@@ -49,9 +49,24 @@
         that:
           - data_dir.stat.pw_name == 'postgres'
           - data_dir.stat.mode == '0700'
-        fail_msg: "/srv/pgdata/main is {{ data_dir.stat.pw_name }} {{ data_dir.stat.mode }}"
+        fail_msg: "/srv/pgdata/18/main is {{ data_dir.stat.pw_name }} {{ data_dir.stat.mode }}"
 
-    - name: Include postgresql role with a missing parent
+    - name: Stat the version directory
+      ansible.builtin.stat:
+        path: /srv/pgdata/18
+      register: version_dir
+
+    - name: Assert the version directory is owned by postgres with mode 0755
+      ansible.builtin.assert:
+        that:
+          - version_dir.stat.pw_name == 'postgres'
+          - version_dir.stat.gr_name == 'postgres'
+          - version_dir.stat.mode == '0755'
+        fail_msg: >-
+          /srv/pgdata/18 is {{ version_dir.stat.pw_name }}:{{ version_dir.stat.gr_name }}
+          {{ version_dir.stat.mode }}
+
+    - name: Include postgresql role with a data directory on the root filesystem
       block:
         - name: Include postgresql role
           ansible.builtin.include_role:
@@ -60,12 +75,22 @@
             postgresql_data_directory: /srv/unmounted/main
         - name: Fail because the role did not
           ansible.builtin.fail:
-            msg: The role accepted a data directory whose parent does not exist
+            msg: The role accepted a data directory on the root filesystem
       rescue:
-        - name: Assert the role failed on the missing parent
+        - name: Assert the role failed on the root filesystem
           ansible.builtin.assert:
-            that: "'/srv/unmounted does not exist' in ansible_failed_result.msg"
+            that: "'/srv is on the root filesystem' in ansible_failed_result.msg"
             fail_msg: "Unexpected failure: {{ ansible_failed_result.msg }}"
+
+    - name: Stat the unmounted directory
+      ansible.builtin.stat:
+        path: /srv/unmounted
+      register: unmounted_dir
+
+    - name: Assert nothing was created on the root filesystem
+      ansible.builtin.assert:
+        that: not unmounted_dir.stat.exists
+        fail_msg: The role created /srv/unmounted before failing
 
     - name: Include postgresql role on a non-empty directory without PG_VERSION
       block:
@@ -110,3 +135,24 @@
           ansible.builtin.assert:
             that: "'holds a PostgreSQL 17 cluster' in ansible_failed_result.msg"
             fail_msg: "Unexpected failure: {{ ansible_failed_result.msg }}"
+
+    # Last, as it moves the cluster off the volume.
+    - name: Include postgresql role on the root filesystem without requiring a mount
+      ansible.builtin.include_role:
+        name: specsnl.specsops.postgresql
+      vars:
+        postgresql_in_container: false
+        postgresql_data_directory: /srv/rootfs/18/main
+        postgresql_data_directory_require_mount: false
+
+    - name: Query the server's data directory after the move
+      ansible.builtin.command:
+        argv: [psql, -tAc, SHOW data_directory]
+      become_user: postgres
+      register: show_rootfs_data_directory
+      changed_when: false
+
+    - name: Assert the server runs from the root filesystem
+      ansible.builtin.assert:
+        that: show_rootfs_data_directory.stdout == '/srv/rootfs/18/main'
+        fail_msg: "SHOW data_directory returned '{{ show_rootfs_data_directory.stdout }}'"

@@ -15,6 +15,11 @@ postgresql_timezone: UTC
 # target gets the default cluster copied in, one holding PG_VERSION is adopted.
 postgresql_data_directory: ""
 
+# The data directory must land on a mounted filesystem, not on /, so a volume that
+# failed to mount does not get a fresh cluster written to the OS disk. Set to false
+# to keep the data on the root filesystem at a custom path on purpose.
+postgresql_data_directory_require_mount: true
+
 # Only opens the port when the server actually listens off-loopback.
 postgresql_manage_firewall: true
 
