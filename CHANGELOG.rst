@@ -4,6 +4,19 @@ specsnl.specsops Collection Changelog 0.7 Release Notes
 
 .. contents:: Topics
 
+v0.7.1
+======
+
+Release Summary
+---------------
+
+Bugfix release. The ``upcloud_floating_ip`` role now runs in check mode instead of failing every play that includes it under ``--check``.
+
+Bugfixes
+--------
+
+- upcloud_floating_ip - the role now runs in check mode. ``ansible.builtin.uri`` does not support check mode, so under ``--check`` the metadata was never read and the next task failed on its undefined content, failing every play that includes the role. The metadata is now read in check mode too, and the role reports the drop-in it would write or remove without touching it.
+
 v0.7.0
 ======
 
