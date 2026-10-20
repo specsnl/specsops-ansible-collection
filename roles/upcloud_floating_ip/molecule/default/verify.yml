@@ -62,6 +62,26 @@
         that: (molecule_dropin_given.content | b64decode | from_yaml).network.ethernets[molecule_interface].addresses == ['198.51.100.7/32']
         fail_msg: "Unexpected drop-in: {{ molecule_dropin_given.content | b64decode }}"
 
+    # As under ansible-playbook --check: the tasks without check_mode of their own
+    # inherit it from apply.
+    - name: Include upcloud_floating_ip role in check mode after the IP moved away
+      ansible.builtin.include_role:
+        name: specsnl.specsops.upcloud_floating_ip
+        apply:
+          check_mode: true
+      vars:
+        upcloud_floating_ip_metadata_url: "{{ molecule_metadata_base }}/moved.json"
+
+    - name: Read the drop-in after the check mode run
+      ansible.builtin.slurp:
+        src: "{{ molecule_dropin }}"
+      register: molecule_dropin_checked
+
+    - name: Assert check mode left the drop-in alone
+      ansible.builtin.assert:
+        that: molecule_dropin_checked.content == molecule_dropin_given.content
+        fail_msg: "Check mode changed the drop-in: {{ molecule_dropin_checked.content | b64decode }}"
+
     - name: Include upcloud_floating_ip role after the IP moved away
       ansible.builtin.include_role:
         name: specsnl.specsops.upcloud_floating_ip
@@ -77,6 +97,22 @@
       ansible.builtin.assert:
         that: not molecule_dropin_moved.stat.exists
         fail_msg: "{{ molecule_dropin }} is still there without a floating IP"
+
+    - name: Include upcloud_floating_ip role in check mode with floating IPs
+      ansible.builtin.include_role:
+        name: specsnl.specsops.upcloud_floating_ip
+        apply:
+          check_mode: true
+
+    - name: Stat the drop-in after the check mode run
+      ansible.builtin.stat:
+        path: "{{ molecule_dropin }}"
+      register: molecule_dropin_unwritten
+
+    - name: Assert check mode wrote no drop-in
+      ansible.builtin.assert:
+        that: not molecule_dropin_unwritten.stat.exists
+        fail_msg: "Check mode wrote {{ molecule_dropin }}"
 
     - name: Run the role with the public MAC address on no interface
       block:
