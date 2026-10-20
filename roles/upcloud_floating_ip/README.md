@@ -17,10 +17,13 @@ The role:
 4. Removes the drop-in and applies again when no floating IP is assigned. This is what the
    old server does after its IP moved.
 
+Under `--check` the role still reads the metadata, so it reports the drop-in it would
+write or remove without touching it.
+
 ## The metadata
 
 The floating IPs are the entries with `"floating": true` among the `ip_addresses` of the
-public interface:
+public interface. This is the public interface of an UpCloud VM with a floating IP:
 
 ```json
 {
@@ -28,20 +31,24 @@ public interface:
     "interfaces": [
       {
         "index": 1,
-        "type": "public",
-        "mac": "ee:1b:db:ca:61:ee",
         "ip_addresses": [
-          { "address": "94.237.105.53", "family": "IPv4", "floating": false, "dhcp": true },
-          { "address": "94.237.105.50", "family": "IPv4", "floating": true, "dhcp": false }
-        ]
+          { "address": "94.237.109.121", "dhcp": true, "dns": ["94.237.127.9", "94.237.40.9"],
+            "family": "IPv4", "floating": false, "gateway": "94.237.108.1", "network": "94.237.108.0/22" },
+          { "address": "5.22.211.179", "dhcp": false, "family": "IPv4", "floating": true }
+        ],
+        "mac": "e6:42:09:32:5e:9b",
+        "network_id": "03d8bd26-3862-42cf-8a86-88bec05df938",
+        "type": "public"
       }
     ]
   }
 }
 ```
 
-This shape comes from the fixture of cloud-init's UpCloud datasource and has not been
-checked on a VM yet. To check a host by hand:
+The second entry is abridged: only its `address` and `floating` were captured. The role
+uses the interface's `type` and `mac`, and the `family`, `floating` and `address` of its
+entries; `dhcp`, `dns`, `gateway`, `network` and `network_id` are not used. To check a
+host by hand:
 
 ```bash
 curl -s http://169.254.169.254/metadata/v1.json | jq '.network.interfaces'
@@ -50,6 +57,24 @@ curl -s http://169.254.169.254/metadata/v1.json | jq '.network.interfaces'
 UpCloud gives public IPv4 and public IPv6 their own interface by default, so the role
 picks the public interface with an IPv4 address and fails when there is not exactly one.
 Only IPv4 floating IPs are handled.
+
+## Stale metadata
+
+UpCloud does not update a server's metadata when a floating IP is assigned to it or moved
+away from it. Until Metadata is turned off and on again, the role sees the old
+assignment: the new server does not take the IP, and the old one keeps it.
+
+After moving the IP, refresh the metadata on both the new and the old server, then run
+the role:
+
+```bash
+upctl server modify <uuid> --disable-metadata
+upctl server modify <uuid> --enable-metadata
+```
+
+Through the API, that is `PUT /1.3/server/{uuid}` with `"metadata": "no"`, then
+`"metadata": "yes"`. UpCloud describes this in
+[its tutorial on Terraform redeployments with a floating IP](https://upcloud.com/resources/tutorials/reduce-downtime-terraform-redeployments).
 
 ## The drop-in
 
@@ -61,9 +86,9 @@ network:
   ethernets:
     eth0:
       match:
-        macaddress: "ee:1b:db:ca:61:ee"
+        macaddress: "e6:42:09:32:5e:9b"
       addresses:
-        - "94.237.105.50/32"
+        - "5.22.211.179/32"
 ```
 
 The drop-in only adds addresses. DHCP, routes and DNS for the interface come from the file
