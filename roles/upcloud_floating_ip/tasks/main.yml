@@ -41,6 +41,8 @@
     use_proxy: false
     timeout: 10
   register: upcloud_floating_ip_metadata
+  # Only reads, so it also runs in check mode; the tasks after it need the content.
+  check_mode: false
 
 # UpCloud gives public IPv4 and public IPv6 their own interface by default; the
 # floating IPs sit on the IPv4 one.
