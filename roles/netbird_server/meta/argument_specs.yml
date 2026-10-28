@@ -1,0 +1,107 @@
+---
+argument_specs:
+  main:
+    short_description: NetBird server and dashboard as Podman Quadlets behind Caddy
+    description: >-
+      Runs the combined NetBird server (management, signal, relay and STUN, with the
+      embedded IdP) and the dashboard as Podman Quadlets published on 127.0.0.1, with
+      the server's SQLite stores on a mounted data disk, adds a Caddy site after
+      NetBird's documented Caddy setup, and opens the STUN port in ufw. Expects Podman
+      and Caddy to be installed, e.g. by the podman and caddy roles.
+    options:
+      netbird_server_version:
+        type: str
+        required: true
+        description: Image tag of netbirdio/netbird-server, e.g. 0.81.5.
+      netbird_server_dashboard_version:
+        type: str
+        required: true
+        description: Image tag of netbirdio/dashboard, e.g. v2.96.0.
+      netbird_server_image:
+        type: str
+        default: docker.io/netbirdio/netbird-server
+        description: Server image, without the tag.
+      netbird_server_dashboard_image:
+        type: str
+        default: docker.io/netbirdio/dashboard
+        description: Dashboard image, without the tag.
+      netbird_server_domain:
+        type: str
+        required: true
+        description: >-
+          The host name peers, the dashboard and the CLI reach the server on, e.g.
+          netbird.example.com. Also the Caddy site's address.
+      netbird_server_auth_secret:
+        type: str
+        required: true
+        no_log: true
+        description: Shared secret for relay authentication, e.g. from openssl rand -base64 32.
+      netbird_server_store_encryption_key:
+        type: str
+        required: true
+        no_log: true
+        description: >-
+          Key the store's sensitive fields are encrypted with, from openssl rand -base64
+          32. It must never change: the store is unreadable without the key it was
+          written with.
+      netbird_server_session_cookie_key:
+        type: str
+        required: true
+        no_log: true
+        description: >-
+          AES key for the embedded IdP's session cookies, 16, 24 or 32 bytes raw or
+          base64-encoded, e.g. from openssl rand -base64 32.
+      netbird_server_data_dir:
+        type: str
+        default: /srv/netbird
+        description: >-
+          Host directory mounted as /var/lib/netbird, holding store.db, idp.db and
+          events.db. Must be an absolute path.
+      netbird_server_data_dir_require_mount:
+        type: bool
+        default: true
+        description: >-
+          Fail when the data directory would land on the root filesystem, so a data disk
+          that failed to mount does not get a fresh store written to the OS disk.
+      netbird_server_port:
+        type: int
+        default: 8081
+        description: Host port the server is published on, on 127.0.0.1 only.
+      netbird_server_dashboard_port:
+        type: int
+        default: 8080
+        description: Host port the dashboard is published on, on 127.0.0.1 only.
+      netbird_server_stun_port:
+        type: int
+        default: 3478
+        description: UDP port of the embedded STUN server, published on every address.
+      netbird_server_trusted_proxies:
+        type: list
+        elements: str
+        default:
+          - 10.88.0.1/32
+        description: >-
+          CIDRs Caddy's traffic reaches the server from, set as both
+          reverseProxy.trustedHTTPProxies and reverseProxy.trustedPeers, so the server
+          takes the client address from X-Forwarded-For only from them. The default is
+          Podman's default network gateway, which a connection to a port published on
+          127.0.0.1 is masqueraded to.
+      netbird_server_setup_pat_enabled:
+        type: bool
+        default: false
+        description: >-
+          Sets NB_SETUP_PAT_ENABLED=true on the server, so POST /api/setup with
+          create_pat returns a personal access token for automating the bootstrap.
+      netbird_server_manage_firewall:
+        type: bool
+        default: true
+        description: >-
+          When true, allows netbird_server_stun_port/udp in ufw, plus a route rule for
+          the traffic forwarded into the container. Rules this role added for an old
+          port are removed. Skipped in containers, and when ufw is not installed, which
+          logs a warning instead of failing.
+      netbird_server_caddy_sites_dir:
+        type: str
+        default: /etc/caddy/sites
+        description: >-
+          Directory the Caddy site file is written to. The Caddyfile has to import it.

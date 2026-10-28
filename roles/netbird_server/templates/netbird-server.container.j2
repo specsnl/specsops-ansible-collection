@@ -1,0 +1,25 @@
+# Managed by Ansible — specsnl.specsops.netbird_server
+[Unit]
+Description=NetBird server
+Wants=network-online.target
+After=network-online.target
+RequiresMountsFor={{ netbird_server_data_dir_path }}
+
+[Container]
+ContainerName=netbird-server
+Image={{ netbird_server_image }}:{{ netbird_server_version }}
+PublishPort=127.0.0.1:{{ netbird_server_port }}:80
+PublishPort={{ netbird_server_stun_port }}:{{ netbird_server_stun_port }}/udp
+Volume={{ netbird_server_data_dir_path }}:/var/lib/netbird
+Volume={{ netbird_server_config_file }}:/etc/netbird/config.yaml:ro
+{% if netbird_server_setup_pat_enabled %}
+Environment=NB_SETUP_PAT_ENABLED=true
+{% endif %}
+
+[Service]
+Restart=always
+# The first start pulls the image.
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

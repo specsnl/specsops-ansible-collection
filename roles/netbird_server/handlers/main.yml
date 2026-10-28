@@ -1,0 +1,20 @@
+---
+- name: Restart netbird-server
+  ansible.builtin.systemd_service:
+    name: "{{ netbird_server_service }}"
+    state: restarted
+    daemon_reload: true
+  when: not (netbird_server_in_container | bool)
+
+- name: Restart netbird-dashboard
+  ansible.builtin.systemd_service:
+    name: "{{ netbird_server_dashboard_service }}"
+    state: restarted
+    daemon_reload: true
+  when: not (netbird_server_in_container | bool)
+
+- name: Reload caddy
+  ansible.builtin.systemd_service:
+    name: caddy
+    state: reloaded
+  when: not (netbird_server_in_container | bool)

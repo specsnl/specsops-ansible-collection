@@ -1,0 +1,87 @@
+---
+- name: Assert the NetBird data directory is an absolute path
+  ansible.builtin.assert:
+    that:
+      - netbird_server_data_dir is match('/')
+      - netbird_server_data_dir | regex_replace('/+$', '') | length > 0
+    fail_msg: "netbird_server_data_dir must be an absolute path below /, got '{{ netbird_server_data_dir }}'"
+    quiet: true
+
+- name: Normalise the NetBird data directory path
+  ansible.builtin.set_fact:
+    netbird_server_data_dir_path: "{{ netbird_server_data_dir | regex_replace('/+$', '') }}"
+
+# Only the ancestors, from the top down. "/" always exists, so it is left out.
+- name: List the NetBird data directory's ancestors
+  ansible.builtin.set_fact:
+    netbird_server_data_dir_ancestors: >-
+      {%- set parts = netbird_server_data_dir_path.split('/') -%}
+      {%- set ancestors = [] -%}
+      {%- for i in range(2, parts | length) -%}
+      {%-   set _ = ancestors.append(parts[:i] | join('/')) -%}
+      {%- endfor -%}
+      {{ ancestors }}
+
+- name: Stat the NetBird data directory's ancestors
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ netbird_server_data_dir_ancestors }}"
+  register: netbird_server_data_ancestors
+
+- name: Stat the NetBird data directory
+  ansible.builtin.stat:
+    path: "{{ netbird_server_data_dir_path }}"
+  register: netbird_server_data_dir_stat
+
+# The data directory itself counts, in case the volume is mounted right there.
+- name: Find the nearest existing directory on the data directory's path
+  ansible.builtin.set_fact:
+    netbird_server_data_existing_path: >-
+      {{ (netbird_server_data_ancestors.results | selectattr('stat.exists') | map(attribute='item') | list
+          + ([netbird_server_data_dir_path] if netbird_server_data_dir_stat.stat.exists else []))
+         | last | default('/') }}
+
+# findmnt rather than ansible_facts.mounts: facts are gathered before a role such
+# as block_volume mounts the volume.
+- name: Find the filesystem the NetBird data directory lands on
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - --noheadings
+      - --output
+      - TARGET
+      - --target
+      - "{{ netbird_server_data_existing_path }}"
+  register: netbird_server_data_mount
+  changed_when: false
+  check_mode: false
+
+# A volume that failed to mount leaves its mount point on the root filesystem,
+# where a fresh store would otherwise be written.
+- name: Fail when the NetBird data directory is on the root filesystem
+  ansible.builtin.fail:
+    msg: >-
+      {{ netbird_server_data_existing_path }} is on the root filesystem, so
+      {{ netbird_server_data_dir_path }} would end up on the OS disk. This role does not mount
+      anything: mount the volume (e.g. with the block_volume role) before running it, or
+      set netbird_server_data_dir_require_mount to false to keep the data on the root
+      filesystem.
+  when:
+    - netbird_server_data_dir_require_mount | bool
+    - netbird_server_data_mount.stdout | trim == '/'
+
+- name: Fail when the NetBird data directory is not a directory
+  ansible.builtin.fail:
+    msg: "{{ netbird_server_data_dir_path }} exists but is not a directory."
+  when:
+    - netbird_server_data_dir_stat.stat.exists
+    - not netbird_server_data_dir_stat.stat.isdir
+
+# The server exits when it cannot open its database, so it does not create this.
+- name: Ensure the NetBird data directory exists
+  ansible.builtin.file:
+    path: "{{ netbird_server_data_dir_path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"

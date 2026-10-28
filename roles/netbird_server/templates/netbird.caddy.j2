@@ -1,0 +1,13 @@
+# Managed by Ansible — specsnl.specsops.netbird_server
+{{ netbird_server_domain }} {
+    # gRPC (management and signal) needs HTTP/2 cleartext to the server.
+    @grpc header Content-Type application/grpc*
+    reverse_proxy @grpc h2c://127.0.0.1:{{ netbird_server_port }}
+
+    # Relay, WebSocket proxy, REST API and the embedded IdP.
+    @backend path /relay* /ws-proxy/* /api/* /oauth2/*
+    reverse_proxy @backend 127.0.0.1:{{ netbird_server_port }}
+
+    # Everything else is the dashboard.
+    reverse_proxy /* 127.0.0.1:{{ netbird_server_dashboard_port }}
+}

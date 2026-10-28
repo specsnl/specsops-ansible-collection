@@ -1,0 +1,14 @@
+---
+netbird_server_config_dir: /etc/netbird-server
+netbird_server_config_file: "{{ netbird_server_config_dir }}/config.yaml"
+netbird_server_dashboard_env_file: "{{ netbird_server_config_dir }}/dashboard.env"
+netbird_server_quadlet_dir: /etc/containers/systemd
+netbird_server_service: netbird-server.service
+netbird_server_dashboard_service: netbird-dashboard.service
+netbird_server_caddy_site_file: "{{ netbird_server_caddy_sites_dir }}/netbird.caddy"
+netbird_server_url: "https://{{ netbird_server_domain }}"
+
+netbird_server_firewall_comment: specsnl.specsops.netbird_server
+# Matches this role's STUN rules in `ufw show added`. Group: the port.
+netbird_server_firewall_port_regexp: >-
+  ^ufw (?:route )?allow (\d+)/udp comment '{{ netbird_server_firewall_comment | regex_escape }}'$

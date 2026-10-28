@@ -1,0 +1,23 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  vars:
+    netbird_server_version: 0.81.5
+    netbird_server_dashboard_version: v2.96.0
+    netbird_server_domain: net.example.test
+    # Throwaway test secrets, not used anywhere else.
+    netbird_server_auth_secret: test-auth-secret
+    netbird_server_store_encryption_key: d6Fv2oYqPpBR7dfi0ElOvOtsTgT+0bqF1k0wXQuy8XQ=
+    netbird_server_session_cookie_key: 8z3Gvc3dVHXoChqT1hIwq0lUjS1kHZGXqk0V5S4nI3E=
+  tasks:
+    - name: Include netbird_server role
+      ansible.builtin.include_role:
+        name: specsnl.specsops.netbird_server
+
+    # The role skips the firewall in containers, and ufw show added works
+    # without enabling ufw, so the firewall tasks are run on their own as on a VM.
+    - name: Include netbird_server firewall tasks
+      ansible.builtin.include_role:
+        name: specsnl.specsops.netbird_server
+        tasks_from: firewall
