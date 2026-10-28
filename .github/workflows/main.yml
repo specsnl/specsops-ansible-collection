@@ -53,6 +53,7 @@ jobs:
           - wireguard
           - upcloud_floating_ip
           - netbird_client
+          - pocket_id
     steps:
       - uses: actions/checkout@v7
       - name: Install collection deps
