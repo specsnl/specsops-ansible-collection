@@ -52,6 +52,7 @@ jobs:
           - block_volume
           - wireguard
           - upcloud_floating_ip
+          - netbird_client
     steps:
       - uses: actions/checkout@v7
       - name: Install collection deps
