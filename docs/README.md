@@ -22,6 +22,7 @@
 | netbird_client      | `specsnl.specsops.netbird_client`      | `pkgs.netbird.io` repo, `netbird` pinned by apt preference, `NB_LAZY_CONN=off` drop-in, `netbird up` with a setup key, else service off and `/var/lib/netbird` deleted; ufw port    |
 | pocket_id           | `specsnl.specsops.pocket_id`           | `pocket-id.container` Quadlet on `127.0.0.1`, `0600` key file for `ENCRYPTION_KEY_FILE`, `PUID`/`PGID` system user, data dir on a mount, `/etc/caddy/sites/` site                   |
 | netbird_server      | `specsnl.specsops.netbird_server`      | `netbird-server` and `netbird-dashboard` Quadlets on `127.0.0.1`, `0600` `config.yaml` with embedded IdP and proxy trust, data dir on a mount, Caddy site, ufw STUN                 |
+| breakglass_user     | `specsnl.specsops.breakglass_user`     | `breakglass` user in `sudo` with a `$6$` password hash, `authorized_keys` removed, `DenyUsers` sshd drop-in, so the password works on the console only                              |
 
 Each role's own README documents its variables in full.
 

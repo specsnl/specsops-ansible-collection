@@ -27,6 +27,7 @@ Ubuntu 26.04 (Resolute) hosts at Specs.
 | `specsnl.specsops.netbird_client`      | NetBird client: pinned install, enrolment with a setup key  | [roles/netbird_client](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/netbird_client/README.md)           |
 | `specsnl.specsops.pocket_id`           | Pocket ID passkey OIDC provider as a Quadlet behind Caddy   | [roles/pocket_id](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/pocket_id/README.md)                     |
 | `specsnl.specsops.netbird_server`      | NetBird server and dashboard as Quadlets behind Caddy       | [roles/netbird_server](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/netbird_server/README.md)           |
+| `specsnl.specsops.breakglass_user`     | console-only sudo user with a password, denied over SSH     | [roles/breakglass_user](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/breakglass_user/README.md)         |
 
 Every role documents its variables in its own README; [docs/README.md](https://github.com/specsnl/specsops-ansible-collection/blob/main/docs/README.md)
 carries the condensed index and the notes on container safety.
