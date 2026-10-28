@@ -38,6 +38,7 @@ jobs:
       netbird_client: ${{ steps.filter.outputs.netbird_client }}
       pocket_id: ${{ steps.filter.outputs.pocket_id }}
       netbird_server: ${{ steps.filter.outputs.netbird_server }}
+      breakglass_user: ${{ steps.filter.outputs.breakglass_user }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -91,6 +92,8 @@ jobs:
               - "roles/pocket_id/**"
             netbird_server:
               - "roles/netbird_server/**"
+            breakglass_user:
+              - "roles/breakglass_user/**"
 
   lint:
     name: Lint
@@ -156,6 +159,8 @@ jobs:
             run: ${{ needs.changes.outputs.pocket_id }}
           - role: netbird_server
             run: ${{ needs.changes.outputs.netbird_server }}
+          - role: breakglass_user
+            run: ${{ needs.changes.outputs.breakglass_user }}
     steps:
       - uses: actions/checkout@v7
         if: ${{ matrix.run == 'true' }}
