@@ -16,3 +16,12 @@ argument_specs:
           never reach the image: a tmpfs anywhere, or any mount when running in a
           container. Wiping those saves nothing, and deletes the running interpreter's
           scratch files when Ansible runs on the target itself.
+      cleanup_state_paths:
+        type: list
+        elements: str
+        default:
+          - /var/lib/netbird
+        description: >-
+          Paths deleted outright, for per-host state that every VM built from the image
+          would otherwise share. The default is the NetBird client's state, which holds
+          its WireGuard private key.
