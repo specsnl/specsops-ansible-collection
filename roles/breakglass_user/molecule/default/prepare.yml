@@ -1,0 +1,56 @@
+---
+- name: Prepare
+  hosts: all
+  become: true
+  tasks:
+    - name: Ensure sshd_config.d directory exists
+      ansible.builtin.file:
+        path: /etc/ssh/sshd_config.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    # Ubuntu cloud images ship this file. With it, sshd would accept the
+    # password, so only DenyUsers keeps the user off SSH.
+    - name: Reproduce the cloud-init sshd drop-in
+      ansible.builtin.copy:
+        content: |
+          # Created by cloud-init
+          PasswordAuthentication yes
+        dest: /etc/ssh/sshd_config.d/50-cloud-init.conf
+        owner: root
+        group: root
+        mode: "0644"
+
+    # The console login has to survive the hardening role.
+    - name: Include hardening role
+      ansible.builtin.include_role:
+        name: specsnl.specsops.hardening
+
+    - name: Install pamtester
+      ansible.builtin.apt:
+        name: pamtester
+        state: present
+
+    # Stand-in for a key converge must remove.
+    - name: Create the user with an authorized key
+      ansible.builtin.user:
+        name: breakglass
+        create_home: true
+
+    - name: Ensure the user's .ssh directory exists
+      ansible.builtin.file:
+        path: /home/breakglass/.ssh
+        state: directory
+        owner: breakglass
+        group: breakglass
+        mode: "0700"
+
+    - name: Seed an authorized key
+      ansible.builtin.copy:
+        content: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMolecule0000000000000000000000000000000000000 stale\n"
+        dest: /home/breakglass/.ssh/authorized_keys
+        owner: breakglass
+        group: breakglass
+        mode: "0600"

@@ -1,0 +1,8 @@
+---
+breakglass_user_name: breakglass
+
+# breakglass_user_password_hash (SHA-512 crypt, $6$...) has no default. Only the
+# hash reaches Ansible; the plaintext stays with whoever may use the console.
+
+# Any number works: DenyUsers adds to the list rather than taking the first value.
+breakglass_user_sshd_dropin_path: /etc/ssh/sshd_config.d/00-breakglass.conf

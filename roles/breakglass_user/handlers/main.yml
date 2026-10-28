@@ -1,0 +1,8 @@
+---
+- name: Reload sshd
+  ansible.builtin.systemd_service:
+    name: ssh
+    state: reloaded
+  when:
+    - not (breakglass_user_in_container | bool)
+    - breakglass_user_sshd.stat.exists

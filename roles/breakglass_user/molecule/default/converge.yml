@@ -1,0 +1,11 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  vars:
+    # Throwaway test password Correct-Horse-1, not used anywhere else.
+    breakglass_user_password_hash: $6$molecule0salt0$pMiEfNEFKezFWLOSMVDSyEvfNmi5LHHg/4q0u22x6KU8oKwqlV2KEDGqbWzJe0uh.AGho4SkWVax0mFW8/r6f/
+  tasks:
+    - name: Include breakglass_user role
+      ansible.builtin.include_role:
+        name: specsnl.specsops.breakglass_user
