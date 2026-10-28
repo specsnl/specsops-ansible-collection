@@ -25,6 +25,7 @@ Ubuntu 26.04 (Resolute) hosts at Specs.
 | `specsnl.specsops.wireguard`           | WireGuard admin hub: peers, forwarding, masquerade, ufw     | [roles/wireguard](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/wireguard/README.md)                     |
 | `specsnl.specsops.upcloud_floating_ip` | UpCloud floating IP on the public interface via netplan     | [roles/upcloud_floating_ip](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/upcloud_floating_ip/README.md) |
 | `specsnl.specsops.netbird_client`      | NetBird client: pinned install, enrolment with a setup key  | [roles/netbird_client](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/netbird_client/README.md)           |
+| `specsnl.specsops.pocket_id`           | Pocket ID passkey OIDC provider as a Quadlet behind Caddy   | [roles/pocket_id](https://github.com/specsnl/specsops-ansible-collection/blob/main/roles/pocket_id/README.md)                     |
 
 Every role documents its variables in its own README; [docs/README.md](https://github.com/specsnl/specsops-ansible-collection/blob/main/docs/README.md)
 carries the condensed index and the notes on container safety.
