@@ -12,7 +12,7 @@ description: >-
   specsdeployd deploy receiver, ansible-pull, a cloud-init default login user
   for images, block storage volumes mounted by label, a WireGuard admin hub,
   UpCloud floating IPs held through netplan, the NetBird client, and Pocket ID
-  as a Podman Quadlet behind Caddy.
+  and the NetBird server and dashboard as Podman Quadlets behind Caddy.
 license:
   - MIT
 tags:
