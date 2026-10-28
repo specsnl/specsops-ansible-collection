@@ -1,0 +1,24 @@
+---
+# netbird_client_version (e.g. 0.81.5) has no default. It is pinned with an apt
+# preference, so an upgrade never moves the client ahead of the server.
+
+netbird_client_repo_key_url: https://pkgs.netbird.io/debian/public.key
+
+# Required with a setup key, e.g. https://netbird.example.com.
+netbird_client_management_url: ""
+
+# netbird_client_setup_key has no default. Without one the role only installs the
+# client, as for an image.
+
+# The peer's NetBird DNS name.
+netbird_client_hostname: "{{ inventory_hostname }}"
+
+# The client silently picks a random port when this one is taken, and the firewall
+# rule below would then not pass it.
+netbird_client_wireguard_port: 51820
+
+# false sets NB_LAZY_CONN=off on the service, which wins over the account setting.
+netbird_client_lazy_connections: false
+
+# Opens netbird_client_wireguard_port/udp in ufw.
+netbird_client_manage_firewall: true

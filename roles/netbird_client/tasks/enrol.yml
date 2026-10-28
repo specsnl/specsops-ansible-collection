@@ -1,0 +1,43 @@
+---
+- name: Enable and start the NetBird client
+  ansible.builtin.systemd_service:
+    name: netbird
+    state: started
+    enabled: true
+
+# Fails after about 10 seconds when the daemon's socket is not up; the peer is
+# then treated as not connected.
+- name: Read the NetBird client status
+  ansible.builtin.command:
+    argv: [netbird, status, --json]
+  register: netbird_client_status
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Decide whether the client still has to come up
+  ansible.builtin.set_fact:
+    netbird_client_up: >-
+      {{ netbird_client_status.rc == 0
+         and (netbird_client_status.stdout | trim).startswith('{')
+         and (netbird_client_status.stdout | from_json).daemonStatus | default('')
+             in netbird_client_up_states }}
+
+# A peer that is already registered logs in by its WireGuard key, so running this
+# again on an enrolled peer does not use up the setup key.
+- name: Bring the NetBird client up with the setup key
+  ansible.builtin.command:
+    argv:
+      - netbird
+      - up
+      - --management-url
+      - "{{ netbird_client_management_url }}"
+      - --setup-key
+      - "{{ netbird_client_setup_key }}"
+      - --hostname
+      - "{{ netbird_client_hostname }}"
+      - --wireguard-port
+      - "{{ netbird_client_wireguard_port | string }}"
+  changed_when: true
+  no_log: true
+  when: not (netbird_client_up | bool)

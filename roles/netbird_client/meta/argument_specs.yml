@@ -1,0 +1,60 @@
+---
+argument_specs:
+  main:
+    short_description: NetBird client
+    description: >-
+      Adds the NetBird apt repository, installs the netbird package at a pinned version
+      and turns lazy connections off on the service. With a setup key it enables the
+      service and enrols the peer; without one it leaves the service stopped and
+      disabled and deletes the client's state, as for an image. Optionally opens the
+      WireGuard port in ufw.
+    options:
+      netbird_client_version:
+        type: str
+        required: true
+        description: >-
+          Package version to install, e.g. 0.81.5. Pinned with an apt preference, so an
+          upgrade never moves the client ahead of the server.
+      netbird_client_repo_key_url:
+        type: str
+        default: https://pkgs.netbird.io/debian/public.key
+        description: URL of the NetBird repository's signing key.
+      netbird_client_management_url:
+        type: str
+        default: ""
+        description: >-
+          The NetBird server, e.g. https://netbird.example.com. Required with
+          netbird_client_setup_key.
+      netbird_client_setup_key:
+        type: str
+        no_log: true
+        description: >-
+          Setup key the peer enrols with. Unset, the role only installs the client,
+          leaves the service stopped and disabled, and deletes /var/lib/netbird, so an
+          image carries no WireGuard key.
+      netbird_client_hostname:
+        type: str
+        description: >-
+          The peer's name in NetBird, which also makes its NetBird DNS name. Defaults
+          to inventory_hostname.
+      netbird_client_wireguard_port:
+        type: int
+        default: 51820
+        description: >-
+          UDP port the client listens on. When it is taken, the client silently picks
+          a random port, which the firewall rule does not pass.
+      netbird_client_lazy_connections:
+        type: bool
+        default: false
+        description: >-
+          When false, a systemd drop-in sets NB_LAZY_CONN=off on netbird.service. The
+          local setting wins over the account setting, so a dashboard toggle cannot
+          make this peer lazy. When true, the drop-in is removed and the account
+          setting applies.
+      netbird_client_manage_firewall:
+        type: bool
+        default: true
+        description: >-
+          When true, opens netbird_client_wireguard_port/udp in ufw. A rule this role
+          added for an old port is removed. Skipped in containers, and when ufw is not
+          installed, which logs a warning instead of failing.
