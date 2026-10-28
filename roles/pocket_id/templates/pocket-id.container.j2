@@ -1,0 +1,27 @@
+# Managed by Ansible — specsnl.specsops.pocket_id
+[Unit]
+Description=Pocket ID
+Wants=network-online.target
+After=network-online.target
+RequiresMountsFor={{ pocket_id_data_dir_path }}
+
+[Container]
+ContainerName=pocket-id
+Image={{ pocket_id_image }}:{{ pocket_id_version }}
+PublishPort=127.0.0.1:{{ pocket_id_port }}:1411
+Volume={{ pocket_id_data_dir_path }}:/app/data
+Volume={{ pocket_id_encryption_key_file }}:{{ pocket_id_encryption_key_file }}:ro
+Environment=APP_URL={{ pocket_id_app_url }}
+Environment=TRUST_PROXY=true
+Environment=ANALYTICS_DISABLED=true
+Environment=ENCRYPTION_KEY_FILE={{ pocket_id_encryption_key_file }}
+Environment=PUID={{ pocket_id_user_account.uid }}
+Environment=PGID={{ pocket_id_user_account.group }}
+
+[Service]
+Restart=always
+# The first start pulls the image.
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+---
+- name: Restart pocket-id
+  ansible.builtin.systemd_service:
+    name: "{{ pocket_id_service }}"
+    state: restarted
+    daemon_reload: true
+  when: not (pocket_id_in_container | bool)
+
+- name: Reload caddy
+  ansible.builtin.systemd_service:
+    name: caddy
+    state: reloaded
+  when: not (pocket_id_in_container | bool)
