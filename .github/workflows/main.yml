@@ -54,6 +54,7 @@ jobs:
           - upcloud_floating_ip
           - netbird_client
           - pocket_id
+          - netbird_server
     steps:
       - uses: actions/checkout@v7
       - name: Install collection deps

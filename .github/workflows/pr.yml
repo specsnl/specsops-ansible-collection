@@ -37,6 +37,7 @@ jobs:
       upcloud_floating_ip: ${{ steps.filter.outputs.upcloud_floating_ip }}
       netbird_client: ${{ steps.filter.outputs.netbird_client }}
       pocket_id: ${{ steps.filter.outputs.pocket_id }}
+      netbird_server: ${{ steps.filter.outputs.netbird_server }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -88,6 +89,8 @@ jobs:
               - "roles/netbird_client/**"
             pocket_id:
               - "roles/pocket_id/**"
+            netbird_server:
+              - "roles/netbird_server/**"
 
   lint:
     name: Lint
@@ -151,6 +154,8 @@ jobs:
             run: ${{ needs.changes.outputs.netbird_client }}
           - role: pocket_id
             run: ${{ needs.changes.outputs.pocket_id }}
+          - role: netbird_server
+            run: ${{ needs.changes.outputs.netbird_server }}
     steps:
       - uses: actions/checkout@v7
         if: ${{ matrix.run == 'true' }}
