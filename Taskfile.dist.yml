@@ -24,6 +24,7 @@ vars:
     - block_volume
     - wireguard
     - upcloud_floating_ip
+    - netbird_client
 
 silent: true
 
