@@ -27,6 +27,7 @@ vars:
     - netbird_client
     - pocket_id
     - netbird_server
+    - breakglass_user
 
 silent: true
 
