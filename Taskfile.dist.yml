@@ -25,6 +25,7 @@ vars:
     - wireguard
     - upcloud_floating_ip
     - netbird_client
+    - pocket_id
 
 silent: true
 
