@@ -288,3 +288,70 @@ releases:
     - 0.7.1-release-summary.yml
     - upcloud-floating-ip-check-mode.yml
     release_date: '2026-10-20'
+  0.8.0:
+    changes:
+      minor_changes:
+      - breakglass_user - new role that creates a console-only login for when NetBird,
+        the only admin door, is down. ``breakglass_user_name`` (``breakglass``) is
+        put in ``sudo`` with ``breakglass_user_password_hash``, which must be a SHA-512
+        crypt hash, so only the hash reaches Ansible. Any ``authorized_keys`` are
+        removed, and an sshd drop-in with ``DenyUsers`` keeps the password off SSH
+        even if password login is ever enabled. ``hardening`` leaves the console's
+        ``login`` PAM stack alone, which Molecule checks by authenticating through
+        it after running ``hardening``.
+      - caddy - the README documents that roles such as ``pocket_id`` write their
+        sites to ``/etc/caddy/sites/``, which the deployed Caddyfile has to import.
+      - cleanup - ``cleanup_state_paths`` (default ``[/var/lib/netbird]``) are deleted
+        outright, as a second guard against baking the NetBird client's WireGuard
+        key into an image.
+      - 'netbird_client - new role that installs the NetBird client from ``pkgs.netbird.io``
+        and pins ``netbird`` at ``netbird_client_version`` with an apt preference,
+        so an upgrade never moves the client ahead of the server. With ``netbird_client_lazy_connections``
+        off (the default) a ``netbird.service`` drop-in sets ``NB_LAZY_CONN=off``,
+        which wins over the account setting. With ``netbird_client_setup_key`` the
+        service is enabled and ``netbird up`` runs with ``netbird_client_management_url``,
+        ``netbird_client_hostname`` and ``netbird_client_wireguard_port`` while the
+        client is not yet connected. Without a setup key the service is stopped and
+        disabled and ``/var/lib/netbird`` is deleted, so VMs built from an image do
+        not share the WireGuard key the package''s post-install script generates.
+        With ``netbird_client_manage_firewall`` the WireGuard port is opened in ufw,
+        tagged ``specsnl.specsops.netbird_client`` so a rule for an old port is removed.
+        No rules are added for ``wt0``: the client accepts tunnel traffic above ufw
+        and enforces NetBird''s policies itself.'
+      - 'netbird_server - new role that runs the self-hosted NetBird control plane
+        as Podman Quadlets: ``netbird-server.container`` from ``netbirdio/netbird-server``
+        (management, signal, relay and STUN with the embedded IdP) and ``netbird-dashboard.container``
+        from ``netbirdio/dashboard``, each pinned and published on ``127.0.0.1``,
+        with STUN published on ``netbird_server_stun_port``. ``/etc/netbird-server/config.yaml``
+        (``0600``) sets the exposed address, the embedded IdP''s issuer and redirect
+        URIs, ``reverseProxy.trustedHTTPProxies`` and ``trustedPeers`` from ``netbird_server_trusted_proxies``
+        (Podman''s gateway, ``10.88.0.1/32``, by default), the SQLite store with its
+        encryption key, and ``disableAnonymousMetrics``. The data directory has to
+        be on a mounted filesystem, like ``pocket_id``. A site file under ``/etc/caddy/sites/``
+        routes gRPC over h2c and the server''s paths to the server and the rest to
+        the dashboard. With ``netbird_server_manage_firewall`` the STUN port gets
+        an ``allow`` and a ``route allow`` rule in ufw, since the published port is
+        forwarded into the container. ``netbird_server_setup_pat_enabled`` sets ``NB_SETUP_PAT_ENABLED=true``
+        for an API-driven bootstrap.'
+      - pocket_id - new role that runs the Pocket ID passkey OIDC provider as a Podman
+        Quadlet, ``/etc/containers/systemd/pocket-id.container``, from ``ghcr.io/pocket-id/pocket-id``
+        at ``pocket_id_version``. The container is published on ``127.0.0.1:<pocket_id_port>``
+        with ``APP_URL``, ``TRUST_PROXY=true`` and ``ANALYTICS_DISABLED=true``, and
+        keeps its SQLite data in ``pocket_id_data_dir``. The role fails when that
+        directory would land on the root filesystem, like ``postgresql``. ``pocket_id_encryption_key``
+        is written to a ``0600`` file for ``ENCRYPTION_KEY_FILE``, owned by a ``pocket-id``
+        system user whose uid and gid the container gets as ``PUID`` and ``PGID``,
+        since the image's entrypoint drops from root before the key is read. A site
+        file under ``/etc/caddy/sites/`` proxies the app URL's host to the container.
+      release_summary: Feature release with four new roles for self-hosted admin access.
+        ``netbird_server`` runs the NetBird control plane and ``pocket_id`` a passkey
+        OIDC provider, both as Podman Quadlets behind Caddy. ``netbird_client`` joins
+        a host to the NetBird network, and ``breakglass_user`` adds a console-only
+        login for when NetBird is down.
+    fragments:
+    - 0.8.0-release-summary.yml
+    - breakglass-user-role.yml
+    - netbird-client-role.yml
+    - netbird-server-role.yml
+    - pocket-id-role.yml
+    release_date: '2026-10-30'
