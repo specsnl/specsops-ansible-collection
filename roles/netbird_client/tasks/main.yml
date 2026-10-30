@@ -1,0 +1,127 @@
+---
+# stat, not a fileglob lookup: lookups run on the controller, which is itself a
+# container here, and would mark every target — real VMs included — as one.
+- name: Stat container marker files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: netbird_client_container_markers
+  loop:
+    - /.dockerenv
+    - /run/.containerenv
+  when: netbird_client_in_container is not defined
+
+- name: Detect container environment
+  ansible.builtin.set_fact:
+    netbird_client_in_container: >-
+      {{ (ansible_facts['virtualization_type'] | default('') in
+          ['docker', 'container', 'containerd', 'podman', 'lxc'])
+         or (netbird_client_container_markers.results
+             | selectattr('stat.exists') | list | length > 0) }}
+  when: netbird_client_in_container is not defined
+
+- name: Assert a management URL comes with the setup key
+  ansible.builtin.assert:
+    that: netbird_client_management_url | length > 0
+    fail_msg: >-
+      netbird_client_setup_key is set but netbird_client_management_url is empty. Set it
+      to the NetBird server, e.g. https://netbird.example.com.
+    quiet: true
+  when: netbird_client_enrol | bool
+
+- name: Install python3-debian
+  ansible.builtin.apt:
+    name: python3-debian
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure /etc/apt/keyrings directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# One suite for every release.
+- name: Add NetBird repository
+  ansible.builtin.deb822_repository:
+    name: netbird
+    types: deb
+    uris: https://pkgs.netbird.io/debian
+    suites: stable
+    components: main
+    signed_by: "{{ netbird_client_repo_key_url }}"
+    state: present
+    enabled: true
+
+# Above 1000, so apt also moves a newer client back to the pinned version.
+- name: Pin the NetBird client version
+  ansible.builtin.copy:
+    content: |
+      Package: netbird
+      Pin: version {{ netbird_client_version }}
+      Pin-Priority: 1001
+    dest: "{{ netbird_client_preferences_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install the NetBird client
+  ansible.builtin.apt:
+    name: "netbird={{ netbird_client_version }}"
+    state: present
+    update_cache: true
+    allow_downgrade: true
+
+- name: Ensure the netbird.service drop-in directory exists
+  ansible.builtin.file:
+    path: "{{ netbird_client_dropin_file | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: not (netbird_client_lazy_connections | bool)
+
+- name: Turn lazy connections off on the client
+  ansible.builtin.copy:
+    content: |
+      [Service]
+      Environment=NB_LAZY_CONN=off
+    dest: "{{ netbird_client_dropin_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: not (netbird_client_lazy_connections | bool)
+  notify: netbird unit changed
+
+- name: Leave lazy connections to the account setting
+  ansible.builtin.file:
+    path: "{{ netbird_client_dropin_file }}"
+    state: absent
+  when: netbird_client_lazy_connections | bool
+  notify: netbird unit changed
+
+# The package's post-install script starts the client, which writes a WireGuard
+# private key to /var/lib/netbird. Every VM cloned from an image that kept it would
+# show up as one peer.
+- name: Stop and disable the unenrolled NetBird client
+  ansible.builtin.systemd_service:
+    name: netbird
+    state: stopped
+    enabled: false
+  when: not (netbird_client_enrol | bool)
+
+- name: Delete the unenrolled NetBird client's state
+  ansible.builtin.file:
+    path: "{{ netbird_client_state_dir }}"
+    state: absent
+  when: not (netbird_client_enrol | bool)
+
+- name: Enrol the NetBird client
+  ansible.builtin.include_tasks: enrol.yml
+  when: netbird_client_enrol | bool
+
+- name: Manage NetBird firewall rules
+  ansible.builtin.include_tasks: firewall.yml
+  when: not (netbird_client_in_container | bool)

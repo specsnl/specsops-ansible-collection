@@ -12,3 +12,15 @@
         - /tmp
         - /srv/cleanup-volume
         - /var/tmp
+
+    - name: Create a NetBird client state directory
+      ansible.builtin.file:
+        path: /var/lib/netbird
+        state: directory
+        mode: "0750"
+
+    - name: Put a client config in the NetBird state directory
+      ansible.builtin.copy:
+        content: "{}\n"
+        dest: /var/lib/netbird/default.json
+        mode: "0600"

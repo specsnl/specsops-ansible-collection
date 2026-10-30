@@ -1,0 +1,140 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  vars:
+    netbird_client_version: 0.81.5
+  tasks:
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+        manager: apt
+
+    - name: Assert the pinned NetBird client is installed
+      ansible.builtin.assert:
+        that:
+          - "'netbird' in ansible_facts.packages"
+          - ansible_facts.packages['netbird'][0].version == '0.81.5'
+        fail_msg: "netbird 0.81.5 is not installed"
+
+    - name: Stat the NetBird sources file
+      ansible.builtin.stat:
+        path: /etc/apt/sources.list.d/netbird.sources
+      register: netbird_sources
+
+    - name: Assert the NetBird repository is configured
+      ansible.builtin.assert:
+        that: netbird_sources.stat.exists
+        fail_msg: "/etc/apt/sources.list.d/netbird.sources does not exist"
+
+    # The candidate is what an apt upgrade would move to, so it is what the pin
+    # has to hold.
+    - name: Read the apt policy for netbird
+      ansible.builtin.command: apt-cache policy netbird
+      register: netbird_policy
+      changed_when: false
+
+    - name: Assert apt holds the client at the pinned version
+      ansible.builtin.assert:
+        that:
+          - netbird_policy.stdout is search('(?m)^\s*Candidate:\s*0\.81\.5$')
+          - netbird_policy.stdout is search('(?m)^\s*(\*\*\* )?0\.81\.5 1001$')
+        fail_msg: "apt-cache policy netbird does not show 0.81.5 as the candidate with priority 1001"
+
+    - name: Read the effective netbird.service environment
+      ansible.builtin.command: systemctl show netbird --property Environment
+      register: netbird_environment
+      changed_when: false
+
+    - name: Assert lazy connections are off on the service
+      ansible.builtin.assert:
+        that: "'NB_LAZY_CONN=off' in netbird_environment.stdout.split()"
+        fail_msg: "netbird.service does not carry NB_LAZY_CONN=off: {{ netbird_environment.stdout }}"
+
+    - name: Check whether netbird.service is enabled
+      ansible.builtin.command: systemctl is-enabled netbird
+      register: netbird_enabled
+      changed_when: false
+      failed_when: false
+
+    - name: Check whether netbird.service is active
+      ansible.builtin.command: systemctl is-active netbird
+      register: netbird_active
+      changed_when: false
+      failed_when: false
+
+    - name: Assert the unenrolled client is stopped and disabled
+      ansible.builtin.assert:
+        that:
+          - netbird_enabled.stdout == 'disabled'
+          - netbird_active.stdout == 'inactive'
+        fail_msg: >-
+          netbird.service is {{ netbird_enabled.stdout }} and {{ netbird_active.stdout }},
+          expected disabled and inactive
+
+    - name: Stat the NetBird state directory
+      ansible.builtin.stat:
+        path: /var/lib/netbird
+      register: netbird_state_dir
+
+    - name: Assert the post-install WireGuard key is gone
+      ansible.builtin.assert:
+        that: not netbird_state_dir.stat.exists
+        fail_msg: "/var/lib/netbird survived, so every clone of this image would share its key"
+
+    - name: Check ufw added rules
+      ansible.builtin.command: ufw show added
+      register: ufw_added_rules
+      changed_when: false
+
+    - name: Assert the NetBird port is open, the stale rule gone and the foreign rule kept
+      ansible.builtin.assert:
+        that:
+          - >-
+            "ufw allow 51820/udp comment 'specsnl.specsops.netbird_client'"
+            in ufw_added_rules.stdout_lines
+          - "'51821' not in ufw_added_rules.stdout"
+          - "'ufw allow 51830/udp' in ufw_added_rules.stdout_lines"
+        fail_msg: "ufw rules are not as expected: {{ ufw_added_rules.stdout_lines }}"
+
+    # The checks below change the configuration, so they run last.
+    - name: Include netbird_client role with a setup key but no management URL
+      block:
+        - name: Include netbird_client role
+          ansible.builtin.include_role:
+            name: specsnl.specsops.netbird_client
+          vars:
+            netbird_client_setup_key: 00000000-0000-0000-0000-000000000000
+        - name: Fail because the role did not
+          ansible.builtin.fail:
+            msg: The role accepted a setup key without a management URL
+      rescue:
+        - name: Assert the role asked for the management URL
+          ansible.builtin.assert:
+            that: "'netbird_client_management_url is empty' in ansible_failed_result.msg"
+            fail_msg: "Unexpected failure: {{ ansible_failed_result.msg }}"
+
+    - name: Leave lazy connections to the account
+      ansible.builtin.include_role:
+        name: specsnl.specsops.netbird_client
+      vars:
+        netbird_client_lazy_connections: true
+
+    - name: Flush handlers
+      ansible.builtin.meta: flush_handlers
+
+    - name: Stat the lazy connections drop-in
+      ansible.builtin.stat:
+        path: /etc/systemd/system/netbird.service.d/lazy-connections.conf
+      register: netbird_dropin
+
+    - name: Read the effective netbird.service environment again
+      ansible.builtin.command: systemctl show netbird --property Environment
+      register: netbird_environment
+      changed_when: false
+
+    - name: Assert the drop-in and its environment are gone
+      ansible.builtin.assert:
+        that:
+          - not netbird_dropin.stat.exists
+          - "'NB_LAZY_CONN' not in netbird_environment.stdout"
+        fail_msg: "NB_LAZY_CONN is still set with netbird_client_lazy_connections true"

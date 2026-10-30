@@ -1,0 +1,20 @@
+---
+galaxy_info:
+  role_name: pocket_id
+  namespace: specsnl
+  author: Ilyes Ahidar
+  description: Pocket ID passkey OIDC provider as a Podman Quadlet behind Caddy
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - resolute
+  galaxy_tags:
+    - ubuntu
+    - resolute
+    - oidc
+    - identity
+    - podman
+    - caddy
+dependencies: []

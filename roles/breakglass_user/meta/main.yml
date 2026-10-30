@@ -1,0 +1,19 @@
+---
+galaxy_info:
+  role_name: breakglass_user
+  namespace: specsnl
+  author: Ilyes Ahidar
+  description: Console-only break-glass sudo user with a password, denied over SSH
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - resolute
+  galaxy_tags:
+    - ubuntu
+    - resolute
+    - security
+    - users
+    - recovery
+dependencies: []

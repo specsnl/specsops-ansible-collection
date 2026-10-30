@@ -1,0 +1,7 @@
+---
+pocket_id_config_dir: /etc/pocket-id
+pocket_id_encryption_key_file: "{{ pocket_id_config_dir }}/encryption-key"
+pocket_id_quadlet_file: /etc/containers/systemd/pocket-id.container
+pocket_id_service: pocket-id.service
+pocket_id_caddy_site_file: "{{ pocket_id_caddy_sites_dir }}/pocket-id.caddy"
+pocket_id_host: "{{ pocket_id_app_url | urlsplit('hostname') }}"

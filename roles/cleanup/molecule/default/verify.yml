@@ -60,6 +60,16 @@
         that: apt_lists_contents.files | length == 0
         fail_msg: "/var/lib/apt/lists still contains package index files after cleanup"
 
+    - name: Stat the NetBird client state directory
+      ansible.builtin.stat:
+        path: /var/lib/netbird
+      register: cleanup_netbird_state
+
+    - name: Assert the NetBird client state was deleted
+      ansible.builtin.assert:
+        that: not cleanup_netbird_state.stat.exists
+        fail_msg: "/var/lib/netbird survived the cleanup"
+
     - name: Run the role again as if on a VM
       ansible.builtin.include_role:
         name: specsnl.specsops.cleanup

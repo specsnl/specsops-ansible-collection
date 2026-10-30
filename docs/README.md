@@ -10,7 +10,7 @@
 | postgresql_apps     | `specsnl.specsops.postgresql_apps`     | per-app login role and password, owned database, `CONNECT` revoked from `PUBLIC`, own `pg_hba` block for the app CIDR, reload. `absent` disables login, never drops                 |
 | swap                | `specsnl.specsops.swap`                | non-sparse swap file create/format, `/etc/fstab` persist, activate, `vm.swappiness` + `vm.vfs_cache_pressure` drop-in                                                               |
 | logrotate           | `specsnl.specsops.logrotate`           | global `maxsize` + `compress` in `/etc/logrotate.conf`, plus per-file overrides for jobs that set their own                                                                         |
-| cleanup             | `specsnl.specsops.cleanup`             | apt autoremove + clean, wipe `/tmp`, `/var/tmp`, `/var/lib/apt/lists` — build-time only                                                                                             |
+| cleanup             | `specsnl.specsops.cleanup`             | apt autoremove + clean, wipe `/tmp`, `/var/tmp`, `/var/lib/apt/lists`, delete `/var/lib/netbird` — build-time only                                                                  |
 | podman              | `specsnl.specsops.podman`              | Podman from the Ubuntu `universe` repo; Resolute's 5.7.x already bundles Quadlet, so no extra apt repo. Ships no unit files                                                         |
 | caddy               | `specsnl.specsops.caddy`               | Cloudsmith apt repo + GPG key, Caddy install, service enable, optional ufw 80/443. Keeps the package's default Caddyfile                                                            |
 | specsdeployd        | `specsnl.specsops.specsdeployd`        | system user, config dir, two-command sudoers drop-in and an enabled-but-dormant unit; `specsdeployd_version` opts into the `.deb`                                                   |
@@ -19,6 +19,10 @@
 | block_volume        | `specsnl.specsops.block_volume`        | disk by UpCloud storage UUID, filesystem only when it has none, mounted by label without `nofail`, `RequiresMountsFor` drop-ins for `required_by` units                             |
 | wireguard           | `specsnl.specsops.wireguard`           | `wireguard-tools`, `0600` interface config from a passed-in key, `wg-quick@` enable, peer-only changes via `wg syncconf`, ip_forward drop-in, MASQUERADE, ufw port and route rules  |
 | upcloud_floating_ip | `specsnl.specsops.upcloud_floating_ip` | floating IPs from the metadata service (or a var) as `/32` on the public interface, found by MAC; `0600` netplan drop-in, generate + apply, removed when none is assigned           |
+| netbird_client      | `specsnl.specsops.netbird_client`      | `pkgs.netbird.io` repo, `netbird` pinned by apt preference, `NB_LAZY_CONN=off` drop-in, `netbird up` with a setup key, else service off and `/var/lib/netbird` deleted; ufw port    |
+| pocket_id           | `specsnl.specsops.pocket_id`           | `pocket-id.container` Quadlet on `127.0.0.1`, `0600` key file for `ENCRYPTION_KEY_FILE`, `PUID`/`PGID` system user, data dir on a mount, `/etc/caddy/sites/` site                   |
+| netbird_server      | `specsnl.specsops.netbird_server`      | `netbird-server` and `netbird-dashboard` Quadlets on `127.0.0.1`, `0600` `config.yaml` with embedded IdP and proxy trust, data dir on a mount, Caddy site, ufw STUN                 |
+| breakglass_user     | `specsnl.specsops.breakglass_user`     | `breakglass` user in `sudo` with a `$6$` password hash, `authorized_keys` removed, `DenyUsers` sshd drop-in, so the password works on the console only                              |
 
 Each role's own README documents its variables in full.
 

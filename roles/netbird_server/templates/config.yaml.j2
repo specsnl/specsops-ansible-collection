@@ -1,0 +1,33 @@
+# Managed by Ansible — specsnl.specsops.netbird_server
+server:
+  listenAddress: ":80"
+  exposedAddress: "{{ netbird_server_url }}:443"
+  stunPorts:
+    - {{ netbird_server_stun_port }}
+  metricsPort: 9090
+  healthcheckAddress: ":9000"
+  logLevel: "info"
+  logFile: "console"
+
+  authSecret: {{ netbird_server_auth_secret | to_json }}
+  dataDir: "/var/lib/netbird"
+  disableAnonymousMetrics: true
+
+  auth:
+    issuer: "{{ netbird_server_url }}/oauth2"
+    signKeyRefreshEnabled: true
+    sessionCookieEncryptionKey: {{ netbird_server_session_cookie_key | to_json }}
+    dashboardRedirectURIs:
+      - "{{ netbird_server_url }}/nb-auth"
+      - "{{ netbird_server_url }}/nb-silent-auth"
+    cliRedirectURIs:
+      - "http://localhost:53000/"
+
+  # Without trustedPeers the server takes X-Forwarded-For from every client.
+  reverseProxy:
+    trustedHTTPProxies: {{ netbird_server_trusted_proxies | to_json }}
+    trustedPeers: {{ netbird_server_trusted_proxies | to_json }}
+
+  store:
+    engine: "sqlite"
+    encryptionKey: {{ netbird_server_store_encryption_key | to_json }}

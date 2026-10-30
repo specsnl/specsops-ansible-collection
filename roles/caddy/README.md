@@ -27,6 +27,16 @@ netfilter tables.
 The role ships no Caddyfile. The package's default one is left in place; ansible-pull
 replaces it at runtime, so the same role is safe to run at image-build time.
 
+## Site files from other roles
+
+Roles that run a service behind Caddy, `pocket_id` and `netbird_server`, write their
+site to its own file under `/etc/caddy/sites/` and reload Caddy. Since this role ships no
+Caddyfile, the Caddyfile you deploy has to import them:
+
+```caddyfile
+import /etc/caddy/sites/*
+```
+
 ## Example
 
 ```yaml

@@ -1,0 +1,161 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  vars:
+    pocket_id_version: v2.19.1
+    pocket_id_app_url: https://id.example.test
+    pocket_id_encryption_key: 0123456789abcdef0123456789abcdef
+  tasks:
+    - name: Look up the pocket-id user
+      ansible.builtin.getent:
+        database: passwd
+        key: pocket-id
+
+    - name: Assert pocket-id is a system user without a login shell
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.getent_passwd['pocket-id'][1] | int < 1000
+          - ansible_facts.getent_passwd['pocket-id'][5] == '/usr/sbin/nologin'
+        fail_msg: "pocket-id is not a nologin system user: {{ ansible_facts.getent_passwd['pocket-id'] }}"
+
+    - name: Stat the encryption key file
+      ansible.builtin.stat:
+        path: /etc/pocket-id/encryption-key
+      register: pocket_id_key
+
+    - name: Read the encryption key file
+      ansible.builtin.slurp:
+        src: /etc/pocket-id/encryption-key
+      register: pocket_id_key_content
+
+    - name: Assert the key file is the key alone, readable by pocket-id only
+      ansible.builtin.assert:
+        that:
+          - pocket_id_key.stat.mode == '0600'
+          - pocket_id_key.stat.pw_name == 'pocket-id'
+          - (pocket_id_key_content.content | b64decode) == '0123456789abcdef0123456789abcdef'
+        fail_msg: "/etc/pocket-id/encryption-key is not the bare key in a 0600 pocket-id file"
+
+    - name: Stat the data directory
+      ansible.builtin.stat:
+        path: /srv/pocket-id
+      register: pocket_id_data
+
+    - name: Assert the data directory belongs to pocket-id
+      ansible.builtin.assert:
+        that:
+          - pocket_id_data.stat.pw_name == 'pocket-id'
+          - pocket_id_data.stat.gr_name == 'pocket-id'
+          - pocket_id_data.stat.mode == '0700'
+        fail_msg: >-
+          /srv/pocket-id is {{ pocket_id_data.stat.pw_name }}:{{ pocket_id_data.stat.gr_name }}
+          {{ pocket_id_data.stat.mode }}
+
+    - name: Read the Quadlet
+      ansible.builtin.slurp:
+        src: /etc/containers/systemd/pocket-id.container
+      register: pocket_id_quadlet
+
+    - name: Assert the Quadlet runs the pinned image on loopback with the key file
+      vars:
+        lines: "{{ (pocket_id_quadlet.content | b64decode).splitlines() }}"
+      ansible.builtin.assert:
+        that:
+          - "'Image=ghcr.io/pocket-id/pocket-id:v2.19.1' in lines"
+          - "'PublishPort=127.0.0.1:1411:1411' in lines"
+          - "'Volume=/srv/pocket-id:/app/data' in lines"
+          - "'Volume=/etc/pocket-id/encryption-key:/etc/pocket-id/encryption-key:ro' in lines"
+          - "'Environment=APP_URL=https://id.example.test' in lines"
+          - "'Environment=TRUST_PROXY=true' in lines"
+          - "'Environment=ANALYTICS_DISABLED=true' in lines"
+          - "'Environment=ENCRYPTION_KEY_FILE=/etc/pocket-id/encryption-key' in lines"
+          - "'Environment=PUID=' ~ ansible_facts.getent_passwd['pocket-id'][1] in lines"
+          - "'Environment=PGID=' ~ ansible_facts.getent_passwd['pocket-id'][2] in lines"
+          - "'RequiresMountsFor=/srv/pocket-id' in lines"
+          - "'0123456789abcdef' not in (pocket_id_quadlet.content | b64decode)"
+        fail_msg: "pocket-id.container does not match the expected configuration"
+
+    # What systemd runs at daemon-reload, so the Quadlet must generate a unit.
+    - name: Generate the units from the Quadlets
+      ansible.builtin.command: /usr/lib/systemd/system-generators/podman-system-generator --dryrun
+      register: pocket_id_generated
+      changed_when: false
+
+    - name: Assert the Quadlet generates pocket-id.service
+      ansible.builtin.assert:
+        that:
+          - "'---pocket-id.service---' in pocket_id_generated.stdout"
+          - "'127.0.0.1:1411:1411' in pocket_id_generated.stdout"
+          - "'ghcr.io/pocket-id/pocket-id:v2.19.1' in pocket_id_generated.stdout"
+        fail_msg: "The Quadlet generator did not produce the expected pocket-id.service"
+
+    - name: Read the Caddy site
+      ansible.builtin.slurp:
+        src: /etc/caddy/sites/pocket-id.caddy
+      register: pocket_id_site
+
+    - name: Assert the site proxies the app URL's host to the container
+      vars:
+        lines: "{{ (pocket_id_site.content | b64decode).splitlines() | map('trim') | list }}"
+      ansible.builtin.assert:
+        that:
+          - "'id.example.test {' in lines"
+          - "'reverse_proxy 127.0.0.1:1411' in lines"
+        fail_msg: "/etc/caddy/sites/pocket-id.caddy does not match the expected site"
+
+    - name: Adapt the Caddy site
+      ansible.builtin.command:
+        argv: [caddy, adapt, --adapter, caddyfile, --config, /etc/caddy/sites/pocket-id.caddy]
+      register: pocket_id_site_json
+      changed_when: false
+
+    - name: Assert Caddy accepts the site
+      ansible.builtin.assert:
+        that:
+          - "'id.example.test' in pocket_id_site_json.stdout"
+          - "'127.0.0.1:1411' in pocket_id_site_json.stdout"
+        fail_msg: "caddy adapt did not produce the expected route: {{ pocket_id_site_json.stdout }}"
+
+    # The checks below run the role with bad input, so they run last.
+    - name: Include pocket_id role with a data directory on the root filesystem
+      block:
+        - name: Include pocket_id role
+          ansible.builtin.include_role:
+            name: specsnl.specsops.pocket_id
+          vars:
+            pocket_id_data_dir: /srv/unmounted/pocket-id
+        - name: Fail because the role did not
+          ansible.builtin.fail:
+            msg: The role accepted a data directory on the root filesystem
+      rescue:
+        - name: Assert the role failed on the root filesystem
+          ansible.builtin.assert:
+            that: "'/srv is on the root filesystem' in ansible_failed_result.msg"
+            fail_msg: "Unexpected failure: {{ ansible_failed_result.msg }}"
+
+    - name: Stat the unmounted directory
+      ansible.builtin.stat:
+        path: /srv/unmounted
+      register: pocket_id_unmounted
+
+    - name: Assert nothing was created on the root filesystem
+      ansible.builtin.assert:
+        that: not pocket_id_unmounted.stat.exists
+        fail_msg: The role created /srv/unmounted before failing
+
+    - name: Include pocket_id role with a short encryption key
+      block:
+        - name: Include pocket_id role
+          ansible.builtin.include_role:
+            name: specsnl.specsops.pocket_id
+          vars:
+            pocket_id_encryption_key: too-short
+        - name: Fail because the role did not
+          ansible.builtin.fail:
+            msg: The role accepted an encryption key shorter than 16 bytes
+      rescue:
+        - name: Assert the role refused the short key
+          ansible.builtin.assert:
+            that: "'at least 16 bytes' in ansible_failed_result.msg"
+            fail_msg: "Unexpected failure: {{ ansible_failed_result.msg }}"

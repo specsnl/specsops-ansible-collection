@@ -6,3 +6,8 @@ cleanup_paths:
 
 # Skips tmpfs mounts, and any mount in a container: their contents never reach the image.
 cleanup_skip_ephemeral: true
+
+# Removed outright: per-host state that every VM built from the image would
+# otherwise share, such as the NetBird client's WireGuard key.
+cleanup_state_paths:
+  - /var/lib/netbird

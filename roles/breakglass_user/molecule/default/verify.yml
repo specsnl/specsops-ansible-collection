@@ -1,0 +1,91 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  vars:
+    breakglass_user_password_hash: $6$molecule0salt0$pMiEfNEFKezFWLOSMVDSyEvfNmi5LHHg/4q0u22x6KU8oKwqlV2KEDGqbWzJe0uh.AGho4SkWVax0mFW8/r6f/
+  tasks:
+    - name: Look up the user's shadow entry
+      ansible.builtin.getent:
+        database: shadow
+        key: breakglass
+
+    - name: Assert the user has the given hash
+      ansible.builtin.assert:
+        that: ansible_facts.getent_shadow['breakglass'][0] == breakglass_user_password_hash
+        fail_msg: "/etc/shadow does not hold the given hash for breakglass"
+
+    - name: List the user's groups
+      ansible.builtin.command:
+        argv: [id, -nG, breakglass]
+      register: breakglass_groups
+      changed_when: false
+
+    - name: Assert the user is in sudo
+      ansible.builtin.assert:
+        that: "'sudo' in breakglass_groups.stdout.split()"
+        fail_msg: "breakglass is not in sudo: {{ breakglass_groups.stdout }}"
+
+    - name: Stat the user's authorized_keys
+      ansible.builtin.stat:
+        path: /home/breakglass/.ssh/authorized_keys
+      register: breakglass_authorized_keys
+
+    - name: Assert the user has no authorized_keys
+      ansible.builtin.assert:
+        that: not breakglass_authorized_keys.stat.exists
+        fail_msg: "/home/breakglass/.ssh/authorized_keys survived"
+
+    # The effective configuration, since 50-cloud-init.conf enables passwords.
+    - name: Dump the effective sshd configuration
+      ansible.builtin.command: /usr/sbin/sshd -T
+      register: breakglass_sshd_effective
+      changed_when: false
+
+    - name: Assert sshd denies the user
+      ansible.builtin.assert:
+        that: "'denyusers breakglass' in breakglass_sshd_effective.stdout_lines"
+        fail_msg: "sshd -T does not show DenyUsers breakglass"
+
+    # login is the PAM service a console login goes through, after hardening.
+    - name: Authenticate on the console's PAM stack with the password
+      ansible.builtin.command:
+        argv: [pamtester, login, breakglass, authenticate, acct_mgmt]
+        stdin: Correct-Horse-1
+      register: breakglass_pam_login
+      changed_when: false
+      failed_when: false
+
+    - name: Authenticate on the console's PAM stack with a wrong password
+      ansible.builtin.command:
+        argv: [pamtester, login, breakglass, authenticate]
+        stdin: wrong-password
+      register: breakglass_pam_wrong
+      changed_when: false
+      failed_when: false
+
+    - name: Assert the console accepts the password and only the password
+      ansible.builtin.assert:
+        that:
+          - breakglass_pam_login.rc == 0
+          - breakglass_pam_wrong.rc != 0
+        fail_msg: >-
+          pamtester login returned {{ breakglass_pam_login.rc }} for the password and
+          {{ breakglass_pam_wrong.rc }} for a wrong one: {{ breakglass_pam_login.stderr }}
+
+    # The check below runs the role with bad input, so it runs last.
+    - name: Include breakglass_user role with a plaintext password
+      block:
+        - name: Include breakglass_user role
+          ansible.builtin.include_role:
+            name: specsnl.specsops.breakglass_user
+          vars:
+            breakglass_user_password_hash: Correct-Horse-1
+        - name: Fail because the role did not
+          ansible.builtin.fail:
+            msg: The role accepted a plaintext password
+      rescue:
+        - name: Assert the role refused the plaintext password
+          ansible.builtin.assert:
+            that: "'must be a SHA-512 crypt hash' in ansible_failed_result.msg"
+            fail_msg: "Unexpected failure: {{ ansible_failed_result.msg }}"

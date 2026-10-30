@@ -1,8 +1,8 @@
 # specsnl.specsops.cleanup
 
-Build-time image cleanup: `apt autoremove`, `apt clean`, and wipes the contents of
-temp directories. Intended as the final role in a Packer image build to reduce image
-size. Not intended for runtime ansible-pull.
+Build-time image cleanup: `apt autoremove`, `apt clean`, wipes the contents of temp
+directories, and deletes per-host state. Intended as the final role in a Packer image
+build to reduce image size. Not intended for runtime ansible-pull.
 
 ## Mounts that never reach the image are skipped
 
@@ -23,12 +23,21 @@ multiprocessing scratch directory in `/tmp`, and deleting it mid-run makes the
 interpreter's exit handler traceback. Set `cleanup_skip_ephemeral: false` to wipe them
 anyway.
 
+## Per-host state
+
+`cleanup_state_paths` are deleted outright. Every VM built from the image would otherwise
+share what they hold. The default is `/var/lib/netbird`, where the NetBird client keeps its
+WireGuard private key: two VMs with the same key show up as one peer. The
+`netbird_client` role already deletes it when it runs without a setup key; this is the
+second guard.
+
 ## Variables
 
 | Variable                 | Default                                | Description                                   |
 |--------------------------|----------------------------------------|-----------------------------------------------|
 | `cleanup_paths`          | `[/tmp, /var/tmp, /var/lib/apt/lists]` | Directories to wipe                           |
 | `cleanup_skip_ephemeral` | `true`                                 | Leave mounts that never reach the image alone |
+| `cleanup_state_paths`    | `[/var/lib/netbird]`                   | Per-host state deleted outright               |
 
 ## Example
 

@@ -1,0 +1,76 @@
+---
+# stat, not a fileglob lookup: lookups run on the controller, which is itself a
+# container here, and would mark every target — real VMs included — as one.
+- name: Stat container marker files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: breakglass_user_container_markers
+  loop:
+    - /.dockerenv
+    - /run/.containerenv
+  when: breakglass_user_in_container is not defined
+
+- name: Detect container environment
+  ansible.builtin.set_fact:
+    breakglass_user_in_container: >-
+      {{ (ansible_facts['virtualization_type'] | default('') in
+          ['docker', 'container', 'containerd', 'podman', 'lxc'])
+         or (breakglass_user_container_markers.results
+             | selectattr('stat.exists') | list | length > 0) }}
+  when: breakglass_user_in_container is not defined
+
+# A plaintext password here would end up in /etc/shadow as given, and a locked
+# or empty hash would leave the console as closed as the network.
+- name: Assert the password is a SHA-512 crypt hash
+  ansible.builtin.assert:
+    that: breakglass_user_password_hash is match('^\$6\$(rounds=\d+\$)?[^$]+\$[./0-9A-Za-z]{86}$')
+    fail_msg: >-
+      breakglass_user_password_hash must be a SHA-512 crypt hash ($6$<salt>$<hash>),
+      e.g. from mkpasswd -m sha-512.
+    quiet: true
+
+- name: Create the break-glass user
+  ansible.builtin.user:
+    name: "{{ breakglass_user_name }}"
+    password: "{{ breakglass_user_password_hash }}"
+    update_password: always
+    groups:
+      - sudo
+    append: true
+    shell: /bin/bash
+    create_home: true
+  register: breakglass_user_account
+  no_log: true
+
+- name: Remove SSH keys from the break-glass user
+  ansible.builtin.file:
+    path: "{{ breakglass_user_account.home }}/.ssh/{{ item }}"
+    state: absent
+  loop:
+    - authorized_keys
+    - authorized_keys2
+
+# Nothing to validate against without sshd, and the drop-in is ready for when it
+# is installed.
+- name: Check whether sshd is installed
+  ansible.builtin.stat:
+    path: /usr/sbin/sshd
+  register: breakglass_user_sshd
+
+- name: Ensure sshd_config.d directory exists
+  ansible.builtin.file:
+    path: "{{ breakglass_user_sshd_dropin_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deny the break-glass user over SSH
+  ansible.builtin.template:
+    src: sshd-breakglass.conf.j2
+    dest: "{{ breakglass_user_sshd_dropin_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+    validate: "{{ '/usr/sbin/sshd -t -f %s' if breakglass_user_sshd.stat.exists else omit }}"
+  notify: Reload sshd

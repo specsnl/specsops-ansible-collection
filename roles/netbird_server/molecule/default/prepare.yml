@@ -1,0 +1,36 @@
+---
+# Podman and Caddy, as on the VM, so verify.yml can run the Quadlet generator and
+# Caddy's adapter on what the role renders.
+- name: Prepare
+  hosts: all
+  become: true
+  tasks:
+    - name: Include podman role
+      ansible.builtin.include_role:
+        name: specsnl.specsops.podman
+
+    - name: Include caddy role
+      ansible.builtin.include_role:
+        name: specsnl.specsops.caddy
+
+    - name: Install ufw
+      ansible.builtin.apt:
+        name: ufw
+        state: present
+
+    # Stand-ins for what converge must clean up: rules for a STUN port since
+    # changed.
+    - name: Seed stale STUN port rule
+      community.general.ufw:
+        rule: allow
+        port: "3479"
+        proto: udp
+        comment: specsnl.specsops.netbird_server
+
+    - name: Seed stale STUN route rule
+      community.general.ufw:
+        rule: allow
+        route: true
+        port: "3479"
+        proto: udp
+        comment: specsnl.specsops.netbird_server

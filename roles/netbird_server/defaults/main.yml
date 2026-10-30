@@ -1,0 +1,32 @@
+---
+# netbird_server_version (e.g. 0.81.5), netbird_server_dashboard_version (e.g. v2.96.0),
+# netbird_server_domain (e.g. netbird.example.com), netbird_server_auth_secret,
+# netbird_server_store_encryption_key and netbird_server_session_cookie_key have
+# no default. The store key must never change: the store is unreadable without it.
+
+netbird_server_image: docker.io/netbirdio/netbird-server
+netbird_server_dashboard_image: docker.io/netbirdio/dashboard
+
+# On the data disk. The role fails when it would land on the root filesystem.
+netbird_server_data_dir: /srv/netbird
+netbird_server_data_dir_require_mount: true
+
+# Published on 127.0.0.1 only; Caddy proxies to them.
+netbird_server_port: 8081
+netbird_server_dashboard_port: 8080
+
+# Published on every address, and opened in ufw.
+netbird_server_stun_port: 3478
+
+# Where Caddy's traffic reaches the server from: Podman's default network gateway,
+# since a connection to a port published on 127.0.0.1 is masqueraded to it.
+netbird_server_trusted_proxies:
+  - 10.88.0.1/32
+
+# Makes POST /api/setup return a personal access token with create_pat.
+netbird_server_setup_pat_enabled: false
+
+# Opens netbird_server_stun_port/udp in ufw, for the host and for the container.
+netbird_server_manage_firewall: true
+
+netbird_server_caddy_sites_dir: /etc/caddy/sites

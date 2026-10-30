@@ -1,0 +1,18 @@
+---
+# Enrolment needs a NetBird server, so only the install-only path is converged.
+- name: Converge
+  hosts: all
+  become: true
+  vars:
+    netbird_client_version: 0.81.5
+  tasks:
+    - name: Include netbird_client role
+      ansible.builtin.include_role:
+        name: specsnl.specsops.netbird_client
+
+    # The role skips the firewall in containers, and ufw show added works
+    # without enabling ufw, so the firewall tasks are run on their own as on a VM.
+    - name: Include netbird_client firewall tasks
+      ansible.builtin.include_role:
+        name: specsnl.specsops.netbird_client
+        tasks_from: firewall

@@ -1,0 +1,26 @@
+---
+argument_specs:
+  main:
+    short_description: Console-only break-glass user
+    description: >-
+      Creates a sudo user that logs in with a password on the console, for when no
+      network path into the host is left. The user has no authorized_keys, and an sshd
+      drop-in denies it over SSH, so the password works on the console only.
+    options:
+      breakglass_user_name:
+        type: str
+        default: breakglass
+        description: Name of the user.
+      breakglass_user_password_hash:
+        type: str
+        required: true
+        no_log: true
+        description: >-
+          The password as a SHA-512 crypt hash ($6$...), e.g. from mkpasswd -m sha-512.
+          Only the hash reaches Ansible.
+      breakglass_user_sshd_dropin_path:
+        type: str
+        default: /etc/ssh/sshd_config.d/00-breakglass.conf
+        description: >-
+          sshd drop-in holding DenyUsers for the user. DenyUsers adds to the list from
+          every file, so the number does not matter.

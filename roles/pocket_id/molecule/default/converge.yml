@@ -1,0 +1,13 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  vars:
+    pocket_id_version: v2.19.1
+    pocket_id_app_url: https://id.example.test
+    # Throwaway test key, not used anywhere else.
+    pocket_id_encryption_key: 0123456789abcdef0123456789abcdef
+  tasks:
+    - name: Include pocket_id role
+      ansible.builtin.include_role:
+        name: specsnl.specsops.pocket_id

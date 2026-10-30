@@ -1,0 +1,195 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  vars:
+    netbird_server_version: 0.81.5
+    netbird_server_dashboard_version: v2.96.0
+    netbird_server_domain: net.example.test
+    netbird_server_auth_secret: test-auth-secret
+    netbird_server_store_encryption_key: d6Fv2oYqPpBR7dfi0ElOvOtsTgT+0bqF1k0wXQuy8XQ=
+    netbird_server_session_cookie_key: 8z3Gvc3dVHXoChqT1hIwq0lUjS1kHZGXqk0V5S4nI3E=
+  tasks:
+    - name: Stat the server config
+      ansible.builtin.stat:
+        path: /etc/netbird-server/config.yaml
+      register: netbird_config
+
+    - name: Assert the server config is readable by root only
+      ansible.builtin.assert:
+        that:
+          - netbird_config.stat.mode == '0600'
+          - netbird_config.stat.pw_name == 'root'
+        fail_msg: "/etc/netbird-server/config.yaml is not 0600 root"
+
+    - name: Read the server config
+      ansible.builtin.slurp:
+        src: /etc/netbird-server/config.yaml
+      register: netbird_config_content
+
+    - name: Assert the server config carries the domain, secrets and proxy trust
+      vars:
+        server: "{{ (netbird_config_content.content | b64decode | from_yaml).server }}"
+      ansible.builtin.assert:
+        that:
+          - server.listenAddress == ':80'
+          - server.exposedAddress == 'https://net.example.test:443'
+          - server.stunPorts == [3478]
+          - server.authSecret == 'test-auth-secret'
+          - server.dataDir == '/var/lib/netbird'
+          - server.disableAnonymousMetrics
+          - server.auth.issuer == 'https://net.example.test/oauth2'
+          - server.auth.sessionCookieEncryptionKey == '8z3Gvc3dVHXoChqT1hIwq0lUjS1kHZGXqk0V5S4nI3E='
+          - "'https://net.example.test/nb-auth' in server.auth.dashboardRedirectURIs"
+          - "'https://net.example.test/nb-silent-auth' in server.auth.dashboardRedirectURIs"
+          - server.auth.cliRedirectURIs == ['http://localhost:53000/']
+          - server.reverseProxy.trustedHTTPProxies == ['10.88.0.1/32']
+          - server.reverseProxy.trustedPeers == ['10.88.0.1/32']
+          - server.store.engine == 'sqlite'
+          - server.store.encryptionKey == 'd6Fv2oYqPpBR7dfi0ElOvOtsTgT+0bqF1k0wXQuy8XQ='
+        fail_msg: "config.yaml does not match the expected configuration"
+
+    - name: Read the dashboard environment
+      ansible.builtin.slurp:
+        src: /etc/netbird-server/dashboard.env
+      register: netbird_server_dashboard_env
+
+    - name: Assert the dashboard points at the server and its IdP
+      vars:
+        lines: "{{ (netbird_server_dashboard_env.content | b64decode).splitlines() }}"
+      ansible.builtin.assert:
+        that:
+          - "'NETBIRD_MGMT_API_ENDPOINT=https://net.example.test' in lines"
+          - "'NETBIRD_MGMT_GRPC_API_ENDPOINT=https://net.example.test' in lines"
+          - "'AUTH_AUTHORITY=https://net.example.test/oauth2' in lines"
+          - "'AUTH_CLIENT_ID=netbird-dashboard' in lines"
+          - "'USE_AUTH0=false' in lines"
+        fail_msg: "dashboard.env does not match the expected configuration"
+
+    - name: Read the server Quadlet
+      ansible.builtin.slurp:
+        src: /etc/containers/systemd/netbird-server.container
+      register: netbird_server_quadlet
+
+    - name: Assert the server Quadlet publishes the API on loopback and STUN on every address
+      vars:
+        lines: "{{ (netbird_server_quadlet.content | b64decode).splitlines() }}"
+      ansible.builtin.assert:
+        that:
+          - "'Image=docker.io/netbirdio/netbird-server:0.81.5' in lines"
+          - "'PublishPort=127.0.0.1:8081:80' in lines"
+          - "'PublishPort=3478:3478/udp' in lines"
+          - "'Volume=/srv/netbird:/var/lib/netbird' in lines"
+          - "'Volume=/etc/netbird-server/config.yaml:/etc/netbird/config.yaml:ro' in lines"
+          - "'RequiresMountsFor=/srv/netbird' in lines"
+          - "'Environment=NB_SETUP_PAT_ENABLED=true' not in lines"
+        fail_msg: "netbird-server.container does not match the expected configuration"
+
+    - name: Read the dashboard Quadlet
+      ansible.builtin.slurp:
+        src: /etc/containers/systemd/netbird-dashboard.container
+      register: netbird_server_dashboard_quadlet
+
+    - name: Assert the dashboard Quadlet publishes on loopback with its environment
+      vars:
+        lines: "{{ (netbird_server_dashboard_quadlet.content | b64decode).splitlines() }}"
+      ansible.builtin.assert:
+        that:
+          - "'Image=docker.io/netbirdio/dashboard:v2.96.0' in lines"
+          - "'PublishPort=127.0.0.1:8080:80' in lines"
+          - "'EnvironmentFile=/etc/netbird-server/dashboard.env' in lines"
+        fail_msg: "netbird-dashboard.container does not match the expected configuration"
+
+    # What systemd runs at daemon-reload, so the Quadlets must generate units.
+    - name: Generate the units from the Quadlets
+      ansible.builtin.command: /usr/lib/systemd/system-generators/podman-system-generator --dryrun
+      register: netbird_generated
+      changed_when: false
+
+    - name: Assert the Quadlets generate both services
+      ansible.builtin.assert:
+        that:
+          - "'---netbird-server.service---' in netbird_generated.stdout"
+          - "'---netbird-dashboard.service---' in netbird_generated.stdout"
+          - "'3478:3478/udp' in netbird_generated.stdout"
+          - "'--env-file /etc/netbird-server/dashboard.env' in netbird_generated.stdout"
+        fail_msg: "The Quadlet generator did not produce the expected NetBird services"
+
+    - name: Adapt the Caddy site
+      ansible.builtin.command:
+        argv: [caddy, adapt, --adapter, caddyfile, --config, /etc/caddy/sites/netbird.caddy]
+      register: netbird_site_json
+      changed_when: false
+
+    - name: Assert Caddy routes gRPC, the server paths and the dashboard
+      vars:
+        routes: "{{ (netbird_site_json.stdout | from_json).apps.http.servers.srv0.routes[0].handle[0].routes }}"
+        upstreams: "{{ routes | map(attribute='handle') | flatten | map(attribute='upstreams') | flatten | map(attribute='dial') | list }}"
+      ansible.builtin.assert:
+        that:
+          - "'net.example.test' in netbird_site_json.stdout"
+          - "'application/grpc*' in netbird_site_json.stdout"
+          - "'\"h2c\"' in netbird_site_json.stdout"
+          - "'/oauth2/*' in netbird_site_json.stdout"
+          - upstreams == ['127.0.0.1:8081', '127.0.0.1:8081', '127.0.0.1:8080']
+        fail_msg: "caddy adapt did not produce the expected routes: {{ upstreams }}"
+
+    - name: Check ufw added rules
+      ansible.builtin.command: ufw show added
+      register: ufw_added_rules
+      changed_when: false
+
+    - name: Assert STUN is open and routed, and the stale rules are gone
+      ansible.builtin.assert:
+        that:
+          - >-
+            "ufw allow 3478/udp comment 'specsnl.specsops.netbird_server'"
+            in ufw_added_rules.stdout_lines
+          - >-
+            "ufw route allow 3478/udp comment 'specsnl.specsops.netbird_server'"
+            in ufw_added_rules.stdout_lines
+          - "'3479' not in ufw_added_rules.stdout"
+        fail_msg: "ufw rules are not as expected: {{ ufw_added_rules.stdout_lines }}"
+
+    # The checks below change the configuration, so they run last.
+    - name: Enable the setup PAT
+      ansible.builtin.include_role:
+        name: specsnl.specsops.netbird_server
+      vars:
+        netbird_server_setup_pat_enabled: true
+
+    - name: Read the server Quadlet with the setup PAT
+      ansible.builtin.slurp:
+        src: /etc/containers/systemd/netbird-server.container
+      register: netbird_server_quadlet
+
+    - name: Assert the server gets NB_SETUP_PAT_ENABLED
+      ansible.builtin.assert:
+        that: "'Environment=NB_SETUP_PAT_ENABLED=true' in (netbird_server_quadlet.content | b64decode).splitlines()"
+        fail_msg: "netbird_server_setup_pat_enabled did not set NB_SETUP_PAT_ENABLED"
+
+    - name: Include netbird_server role with a data directory on the root filesystem
+      block:
+        - name: Include netbird_server role
+          ansible.builtin.include_role:
+            name: specsnl.specsops.netbird_server
+          vars:
+            netbird_server_data_dir: /srv/unmounted/netbird
+        - name: Fail because the role did not
+          ansible.builtin.fail:
+            msg: The role accepted a data directory on the root filesystem
+      rescue:
+        - name: Assert the role failed on the root filesystem
+          ansible.builtin.assert:
+            that: "'/srv is on the root filesystem' in ansible_failed_result.msg"
+            fail_msg: "Unexpected failure: {{ ansible_failed_result.msg }}"
+
+    - name: Stat the unmounted directory
+      ansible.builtin.stat:
+        path: /srv/unmounted
+      register: netbird_unmounted
+
+    - name: Assert nothing was created on the root filesystem
+      ansible.builtin.assert:
+        that: not netbird_unmounted.stat.exists
+        fail_msg: The role created /srv/unmounted before failing

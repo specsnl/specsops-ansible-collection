@@ -1,0 +1,128 @@
+---
+# stat, not a fileglob lookup: lookups run on the controller, which is itself a
+# container here, and would mark every target — real VMs included — as one.
+- name: Stat container marker files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: netbird_server_container_markers
+  loop:
+    - /.dockerenv
+    - /run/.containerenv
+  when: netbird_server_in_container is not defined
+
+- name: Detect container environment
+  ansible.builtin.set_fact:
+    netbird_server_in_container: >-
+      {{ (ansible_facts['virtualization_type'] | default('') in
+          ['docker', 'container', 'containerd', 'podman', 'lxc'])
+         or (netbird_server_container_markers.results
+             | selectattr('stat.exists') | list | length > 0) }}
+  when: netbird_server_in_container is not defined
+
+- name: Assert the domain and secrets are set
+  ansible.builtin.assert:
+    that:
+      - netbird_server_domain | length > 0
+      - "'/' not in netbird_server_domain"
+      - netbird_server_auth_secret | length > 0
+      - netbird_server_store_encryption_key | length > 0
+      - netbird_server_session_cookie_key | length > 0
+    fail_msg: >-
+      netbird_server_domain must be a bare host name such as netbird.example.com, and
+      netbird_server_auth_secret, netbird_server_store_encryption_key and
+      netbird_server_session_cookie_key must not be empty.
+    quiet: true
+
+- name: Prepare the NetBird data directory
+  ansible.builtin.include_tasks: data_dir.yml
+
+- name: Ensure the NetBird config directory exists
+  ansible.builtin.file:
+    path: "{{ netbird_server_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Deploy the NetBird server config
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: "{{ netbird_server_config_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: Restart netbird-server
+
+- name: Deploy the NetBird dashboard environment
+  ansible.builtin.template:
+    src: dashboard.env.j2
+    dest: "{{ netbird_server_dashboard_env_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart netbird-dashboard
+
+- name: Ensure the Quadlet directory exists
+  ansible.builtin.file:
+    path: "{{ netbird_server_quadlet_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy the NetBird server Quadlet
+  ansible.builtin.template:
+    src: netbird-server.container.j2
+    dest: "{{ netbird_server_quadlet_dir }}/netbird-server.container"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart netbird-server
+
+- name: Deploy the NetBird dashboard Quadlet
+  ansible.builtin.template:
+    src: netbird-dashboard.container.j2
+    dest: "{{ netbird_server_quadlet_dir }}/netbird-dashboard.container"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart netbird-dashboard
+
+- name: Ensure the Caddy sites directory exists
+  ansible.builtin.file:
+    path: "{{ netbird_server_caddy_sites_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy the NetBird Caddy site
+  ansible.builtin.template:
+    src: netbird.caddy.j2
+    dest: "{{ netbird_server_caddy_site_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload caddy
+
+# The restart handlers also start a stopped unit, so they run first and this
+# only catches a unit that is down without a change.
+- name: Flush NetBird handlers
+  ansible.builtin.meta: flush_handlers
+
+# Quadlet units are generated, so they cannot be enabled; each Quadlet's
+# [Install] section starts it at boot.
+- name: Start the NetBird server and dashboard
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: started
+    daemon_reload: true
+  loop:
+    - "{{ netbird_server_service }}"
+    - "{{ netbird_server_dashboard_service }}"
+  when: not (netbird_server_in_container | bool)
+
+- name: Manage NetBird server firewall rules
+  ansible.builtin.include_tasks: firewall.yml
+  when: not (netbird_server_in_container | bool)

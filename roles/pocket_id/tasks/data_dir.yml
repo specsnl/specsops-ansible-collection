@@ -1,0 +1,86 @@
+---
+- name: Assert the Pocket ID data directory is an absolute path
+  ansible.builtin.assert:
+    that:
+      - pocket_id_data_dir is match('/')
+      - pocket_id_data_dir | regex_replace('/+$', '') | length > 0
+    fail_msg: "pocket_id_data_dir must be an absolute path below /, got '{{ pocket_id_data_dir }}'"
+    quiet: true
+
+- name: Normalise the Pocket ID data directory path
+  ansible.builtin.set_fact:
+    pocket_id_data_dir_path: "{{ pocket_id_data_dir | regex_replace('/+$', '') }}"
+
+# Only the ancestors, from the top down. "/" always exists, so it is left out.
+- name: List the Pocket ID data directory's ancestors
+  ansible.builtin.set_fact:
+    pocket_id_data_dir_ancestors: >-
+      {%- set parts = pocket_id_data_dir_path.split('/') -%}
+      {%- set ancestors = [] -%}
+      {%- for i in range(2, parts | length) -%}
+      {%-   set _ = ancestors.append(parts[:i] | join('/')) -%}
+      {%- endfor -%}
+      {{ ancestors }}
+
+- name: Stat the Pocket ID data directory's ancestors
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ pocket_id_data_dir_ancestors }}"
+  register: pocket_id_data_ancestors
+
+- name: Stat the Pocket ID data directory
+  ansible.builtin.stat:
+    path: "{{ pocket_id_data_dir_path }}"
+  register: pocket_id_data_dir_stat
+
+# The data directory itself counts, in case the volume is mounted right there.
+- name: Find the nearest existing directory on the data directory's path
+  ansible.builtin.set_fact:
+    pocket_id_data_existing_path: >-
+      {{ (pocket_id_data_ancestors.results | selectattr('stat.exists') | map(attribute='item') | list
+          + ([pocket_id_data_dir_path] if pocket_id_data_dir_stat.stat.exists else []))
+         | last | default('/') }}
+
+# findmnt rather than ansible_facts.mounts: facts are gathered before a role such
+# as block_volume mounts the volume.
+- name: Find the filesystem the Pocket ID data directory lands on
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - --noheadings
+      - --output
+      - TARGET
+      - --target
+      - "{{ pocket_id_data_existing_path }}"
+  register: pocket_id_data_mount
+  changed_when: false
+  check_mode: false
+
+# A volume that failed to mount leaves its mount point on the root filesystem,
+# where a fresh database would otherwise be written.
+- name: Fail when the Pocket ID data directory is on the root filesystem
+  ansible.builtin.fail:
+    msg: >-
+      {{ pocket_id_data_existing_path }} is on the root filesystem, so
+      {{ pocket_id_data_dir_path }} would end up on the OS disk. This role does not mount
+      anything: mount the volume (e.g. with the block_volume role) before running it, or
+      set pocket_id_data_dir_require_mount to false to keep the data on the root
+      filesystem.
+  when:
+    - pocket_id_data_dir_require_mount | bool
+    - pocket_id_data_mount.stdout | trim == '/'
+
+- name: Fail when the Pocket ID data directory is not a directory
+  ansible.builtin.fail:
+    msg: "{{ pocket_id_data_dir_path }} exists but is not a directory."
+  when:
+    - pocket_id_data_dir_stat.stat.exists
+    - not pocket_id_data_dir_stat.stat.isdir
+
+- name: Ensure the Pocket ID data directory exists
+  ansible.builtin.file:
+    path: "{{ pocket_id_data_dir_path }}"
+    state: directory
+    owner: "{{ pocket_id_user }}"
+    group: "{{ pocket_id_user }}"
+    mode: "0700"

@@ -11,7 +11,9 @@ description: >-
   PostgreSQL and a per-app PostgreSQL role and database, Podman, Caddy, the
   specsdeployd deploy receiver, ansible-pull, a cloud-init default login user
   for images, block storage volumes mounted by label, a WireGuard admin hub,
-  and UpCloud floating IPs held through netplan.
+  UpCloud floating IPs held through netplan, the NetBird client, Pocket ID and
+  the NetBird server and dashboard as Podman Quadlets behind Caddy, and a
+  console-only break-glass user.
 license:
   - MIT
 tags:
@@ -27,11 +29,11 @@ tags:
   - infrastructure
   - wireguard
   - security
-  - database
+  - netbird
   - podman
   - containers
   - caddy
-  - webserver
+  - oidc
   - deployment
   - cloudinit
   - storage

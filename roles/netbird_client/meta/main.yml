@@ -1,0 +1,20 @@
+---
+galaxy_info:
+  role_name: netbird_client
+  namespace: specsnl
+  author: Ilyes Ahidar
+  description: NetBird client — pinned install from the official apt repository, enrolment with a setup key, ufw
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - resolute
+  galaxy_tags:
+    - ubuntu
+    - resolute
+    - netbird
+    - wireguard
+    - vpn
+    - networking
+dependencies: []

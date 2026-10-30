@@ -1,0 +1,14 @@
+---
+# Podman and Caddy, as on the VM, so verify.yml can run the Quadlet generator and
+# Caddy's adapter on what the role renders.
+- name: Prepare
+  hosts: all
+  become: true
+  tasks:
+    - name: Include podman role
+      ansible.builtin.include_role:
+        name: specsnl.specsops.podman
+
+    - name: Include caddy role
+      ansible.builtin.include_role:
+        name: specsnl.specsops.caddy

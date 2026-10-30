@@ -1,0 +1,16 @@
+---
+netbird_client_enrol: "{{ netbird_client_setup_key | default('') | length > 0 }}"
+
+netbird_client_state_dir: /var/lib/netbird
+netbird_client_preferences_file: /etc/apt/preferences.d/netbird
+netbird_client_dropin_file: /etc/systemd/system/netbird.service.d/lazy-connections.conf
+
+# What `netbird status --json` reports for a client that is up or on its way up.
+netbird_client_up_states:
+  - Connected
+  - Connecting
+
+netbird_client_firewall_comment: specsnl.specsops.netbird_client
+# Matches this role's port rule in `ufw show added`. Group: the port.
+netbird_client_firewall_port_regexp: >-
+  ^ufw allow (\d+)/udp comment '{{ netbird_client_firewall_comment | regex_escape }}'$

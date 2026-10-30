@@ -1,0 +1,67 @@
+---
+# This role does not depend on the firewall role, so ufw may simply not be here.
+- name: Check whether ufw is installed
+  ansible.builtin.stat:
+    path: /usr/sbin/ufw
+  register: netbird_client_ufw
+  when: netbird_client_manage_firewall | bool
+
+- name: Warn that the NetBird port was left closed
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: ufw is not installed, so {{ netbird_client_wireguard_port }}/udp was not
+      opened and NetBird peers cannot connect directly. Run the
+      specsnl.specsops.firewall role first, or set netbird_client_manage_firewall to
+      false and manage the rule yourself.
+  when:
+    - netbird_client_manage_firewall | bool
+    - not netbird_client_ufw.stat.exists
+
+# A changed port would otherwise leave its rule active. Only rules carrying this
+# role's comment are considered, so rules added by hand or by the firewall role
+# are left alone.
+- name: Read the added ufw rules
+  ansible.builtin.command: ufw show added
+  register: netbird_client_ufw_added
+  changed_when: false
+  check_mode: false
+  when:
+    - netbird_client_manage_firewall | bool
+    - netbird_client_ufw.stat.exists
+
+- name: Find stale NetBird port rules
+  ansible.builtin.set_fact:
+    netbird_client_firewall_stale_ports: >-
+      {%- set stale = [] -%}
+      {%- for line in netbird_client_ufw_added.stdout_lines -%}
+      {%-   set match = line | regex_search(netbird_client_firewall_port_regexp, '\\1') -%}
+      {%-   if match and match[0] != netbird_client_wireguard_port | string -%}
+      {%-     set _ = stale.append(match[0]) -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ stale }}
+  when:
+    - netbird_client_manage_firewall | bool
+    - netbird_client_ufw.stat.exists
+
+- name: Remove NetBird port rules for an old port
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: udp
+    delete: true
+  loop: "{{ netbird_client_firewall_stale_ports }}"
+  when:
+    - netbird_client_manage_firewall | bool
+    - netbird_client_ufw.stat.exists
+
+# Only the port: the client accepts traffic on wt0 itself, above ufw.
+- name: Allow the NetBird port through the firewall
+  community.general.ufw:
+    rule: allow
+    port: "{{ netbird_client_wireguard_port | string }}"
+    proto: udp
+    comment: "{{ netbird_client_firewall_comment }}"
+  when:
+    - netbird_client_manage_firewall | bool
+    - netbird_client_ufw.stat.exists

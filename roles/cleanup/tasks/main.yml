@@ -73,3 +73,9 @@
     state: absent
   loop: "{{ cleanup_tmp_contents.results | map(attribute='files') | flatten }}"
   when: cleanup_tmp_contents.results | map(attribute='files') | flatten | length > 0
+
+- name: Delete per-host state
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ cleanup_state_paths }}"

@@ -1,0 +1,19 @@
+# Managed by Ansible — specsnl.specsops.netbird_server
+[Unit]
+Description=NetBird dashboard
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=netbird-dashboard
+Image={{ netbird_server_dashboard_image }}:{{ netbird_server_dashboard_version }}
+PublishPort=127.0.0.1:{{ netbird_server_dashboard_port }}:80
+EnvironmentFile={{ netbird_server_dashboard_env_file }}
+
+[Service]
+Restart=always
+# The first start pulls the image.
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

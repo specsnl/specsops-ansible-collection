@@ -1,0 +1,117 @@
+---
+# stat, not a fileglob lookup: lookups run on the controller, which is itself a
+# container here, and would mark every target — real VMs included — as one.
+- name: Stat container marker files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: pocket_id_container_markers
+  loop:
+    - /.dockerenv
+    - /run/.containerenv
+  when: pocket_id_in_container is not defined
+
+- name: Detect container environment
+  ansible.builtin.set_fact:
+    pocket_id_in_container: >-
+      {{ (ansible_facts['virtualization_type'] | default('') in
+          ['docker', 'container', 'containerd', 'podman', 'lxc'])
+         or (pocket_id_container_markers.results
+             | selectattr('stat.exists') | list | length > 0) }}
+  when: pocket_id_in_container is not defined
+
+- name: Assert the app URL and the encryption key are usable
+  ansible.builtin.assert:
+    that:
+      - pocket_id_app_url | urlsplit('scheme') == 'https'
+      - pocket_id_host | length > 0
+      - pocket_id_encryption_key | length >= 16
+    fail_msg: >-
+      pocket_id_app_url must be an https URL such as https://id.example.com, and
+      pocket_id_encryption_key at least 16 bytes long.
+    quiet: true
+
+- name: Create the Pocket ID group
+  ansible.builtin.group:
+    name: "{{ pocket_id_user }}"
+    system: true
+
+- name: Create the Pocket ID user
+  ansible.builtin.user:
+    name: "{{ pocket_id_user }}"
+    group: "{{ pocket_id_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    home: /nonexistent
+    create_home: false
+  register: pocket_id_user_account
+
+- name: Prepare the Pocket ID data directory
+  ansible.builtin.include_tasks: data_dir.yml
+
+- name: Ensure the Pocket ID config directory exists
+  ansible.builtin.file:
+    path: "{{ pocket_id_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+# Owned by the container's user: the entrypoint drops from root before Pocket ID
+# reads the file. No trailing newline, as the file is read byte for byte.
+- name: Write the Pocket ID encryption key
+  ansible.builtin.copy:
+    content: "{{ pocket_id_encryption_key }}"
+    dest: "{{ pocket_id_encryption_key_file }}"
+    owner: "{{ pocket_id_user }}"
+    group: "{{ pocket_id_user }}"
+    mode: "0600"
+  no_log: true
+  notify: Restart pocket-id
+
+- name: Ensure the Quadlet directory exists
+  ansible.builtin.file:
+    path: "{{ pocket_id_quadlet_file | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy the Pocket ID Quadlet
+  ansible.builtin.template:
+    src: pocket-id.container.j2
+    dest: "{{ pocket_id_quadlet_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart pocket-id
+
+- name: Ensure the Caddy sites directory exists
+  ansible.builtin.file:
+    path: "{{ pocket_id_caddy_sites_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy the Pocket ID Caddy site
+  ansible.builtin.template:
+    src: pocket-id.caddy.j2
+    dest: "{{ pocket_id_caddy_site_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload caddy
+
+# The restart handler also starts a stopped unit, so it runs first and this only
+# catches a unit that is down without a change.
+- name: Flush Pocket ID handlers
+  ansible.builtin.meta: flush_handlers
+
+# Quadlet units are generated, so they cannot be enabled; the Quadlet's
+# [Install] section starts it at boot.
+- name: Start Pocket ID
+  ansible.builtin.systemd_service:
+    name: "{{ pocket_id_service }}"
+    state: started
+    daemon_reload: true
+  when: not (pocket_id_in_container | bool)

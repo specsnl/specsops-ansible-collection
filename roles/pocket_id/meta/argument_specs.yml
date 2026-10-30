@@ -1,0 +1,59 @@
+---
+argument_specs:
+  main:
+    short_description: Pocket ID as a Podman Quadlet behind Caddy
+    description: >-
+      Runs the Pocket ID passkey OIDC provider as a Podman Quadlet published on
+      127.0.0.1, with its SQLite data on a mounted data disk and its encryption key in a
+      0600 file, and adds a Caddy site file that proxies the app URL's host to it.
+      Expects Podman and Caddy to be installed, e.g. by the podman and caddy roles.
+    options:
+      pocket_id_version:
+        type: str
+        required: true
+        description: Image tag of ghcr.io/pocket-id/pocket-id, e.g. v2.19.1.
+      pocket_id_image:
+        type: str
+        default: ghcr.io/pocket-id/pocket-id
+        description: Image to run, without the tag.
+      pocket_id_app_url:
+        type: str
+        required: true
+        description: >-
+          The public URL, e.g. https://id.example.com. Its host becomes the Caddy site's
+          address.
+      pocket_id_encryption_key:
+        type: str
+        required: true
+        no_log: true
+        description: >-
+          Key Pocket ID encrypts its secrets in the database with, at least 16 bytes,
+          e.g. from openssl rand -base64 32. It must stay the same for the life of the
+          data: a restored database is unreadable without the key it was written with.
+      pocket_id_data_dir:
+        type: str
+        default: /srv/pocket-id
+        description: >-
+          Host directory mounted as /app/data, holding the SQLite database and uploads.
+          Must be an absolute path.
+      pocket_id_data_dir_require_mount:
+        type: bool
+        default: true
+        description: >-
+          Fail when the data directory would land on the root filesystem, so a data disk
+          that failed to mount does not get a fresh database written to the OS disk.
+      pocket_id_port:
+        type: int
+        default: 1411
+        description: Host port the container is published on, on 127.0.0.1 only.
+      pocket_id_user:
+        type: str
+        default: pocket-id
+        description: >-
+          System user created for the container. Its uid and gid are passed as PUID and
+          PGID, and it owns the data directory and the key file.
+      pocket_id_caddy_sites_dir:
+        type: str
+        default: /etc/caddy/sites
+        description: >-
+          Directory the Caddy site file is written to. The Caddyfile has to import it.
